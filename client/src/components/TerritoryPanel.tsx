@@ -12,6 +12,8 @@ import {
   ChevronDown,
   ChevronUp,
   MapPin,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { TERRITORY_COLORS } from "@/lib/territory-colors";
 import type { ClientTerritory } from "@/pages/home";
@@ -26,6 +28,10 @@ interface TerritoryPanelProps {
   onCreateTerritory: (name: string, color: string, counties: string[]) => void;
   onUpdateTerritory: (id: number, updates: Partial<Pick<ClientTerritory, "name" | "color">>) => void;
   onDeleteTerritory: (id: number) => void;
+  onEditTerritoryCounties: (id: number) => void;
+  onSaveTerritoryCounties: () => void;
+  onCancelEditCounties: () => void;
+  editingTerritoryId: number | null;
   countyNames: Record<string, { name: string; state: string }>;
 }
 
@@ -39,10 +45,14 @@ export default function TerritoryPanel({
   onCreateTerritory,
   onUpdateTerritory,
   onDeleteTerritory,
+  onEditTerritoryCounties,
+  onSaveTerritoryCounties,
+  onCancelEditCounties,
+  editingTerritoryId,
   countyNames,
 }: TerritoryPanelProps) {
   const [territoryName, setTerritoryName] = useState("");
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingNameId, setEditingNameId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -65,76 +75,119 @@ export default function TerritoryPanel({
     return info ? `${info.name}, ${info.state}` : fips;
   };
 
+  const isEditingCounties = editingTerritoryId !== null;
+  const editingTerritory = territories.find((t) => t.id === editingTerritoryId);
+
   return (
     <div className="flex flex-col h-full" data-testid="territory-panel">
-      {/* Create Territory Section */}
+      {/* Create Territory Section — or County Edit Mode */}
       <div className="p-4 border-b border-border">
-        <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          Create Territory
-        </h2>
-
-        <div className="space-y-3">
-          <Input
-            placeholder="Territory name"
-            value={territoryName}
-            onChange={(e) => setTerritoryName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSave();
-            }}
-            data-testid="territory-name-input"
-          />
-
-          <div>
-            <label className="text-xs text-muted-foreground mb-1.5 block">
-              Color
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {TERRITORY_COLORS.map((c) => (
-                <button
-                  key={c.value}
-                  className={`w-6 h-6 rounded-full border-2 transition-transform ${
-                    selectedColor === c.value
-                      ? "border-foreground scale-110"
-                      : "border-transparent hover:scale-105"
-                  } ${usedColors.has(c.value) ? "opacity-30" : ""}`}
-                  style={{ backgroundColor: c.value }}
-                  onClick={() => onColorChange(c.value)}
-                  title={c.name}
-                  data-testid={`color-${c.name.toLowerCase()}`}
-                />
-              ))}
+        {isEditingCounties && editingTerritory ? (
+          <>
+            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Pencil className="w-4 h-4" />
+              Editing: {editingTerritory.name}
+            </h2>
+            <p className="text-xs text-muted-foreground mb-3">
+              Click counties to remove them. Drag to add new ones.
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Badge variant="secondary" data-testid="selected-count">
+                  <MapPin className="w-3 h-3 mr-1" />
+                  {selectedCounties.size} counties
+                </Badge>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1"
+                  onClick={onSaveTerritoryCounties}
+                  disabled={selectedCounties.size === 0}
+                  data-testid="save-county-edits-btn"
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Save Changes
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={onCancelEditCounties}
+                  data-testid="cancel-county-edits-btn"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-          </div>
+          </>
+        ) : (
+          <>
+            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Create Territory
+            </h2>
 
-          <div className="flex items-center justify-between">
-            <Badge variant="secondary" data-testid="selected-count">
-              <MapPin className="w-3 h-3 mr-1" />
-              {selectedCounties.size} counties selected
-            </Badge>
-            {selectedCounties.size > 0 && (
+            <div className="space-y-3">
+              <Input
+                placeholder="Territory name"
+                value={territoryName}
+                onChange={(e) => setTerritoryName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSave();
+                }}
+                data-testid="territory-name-input"
+              />
+
+              <div>
+                <label className="text-xs text-muted-foreground mb-1.5 block">
+                  Color
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {TERRITORY_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      className={`w-6 h-6 rounded-full border-2 transition-transform ${
+                        selectedColor === c.value
+                          ? "border-foreground scale-110"
+                          : "border-transparent hover:scale-105"
+                      } ${usedColors.has(c.value) ? "opacity-30" : ""}`}
+                      style={{ backgroundColor: c.value }}
+                      onClick={() => onColorChange(c.value)}
+                      title={c.name}
+                      data-testid={`color-${c.name.toLowerCase()}`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Badge variant="secondary" data-testid="selected-count">
+                  <MapPin className="w-3 h-3 mr-1" />
+                  {selectedCounties.size} counties selected
+                </Badge>
+                {selectedCounties.size > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onClearSelection}
+                    data-testid="clear-selection-btn"
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+
               <Button
-                variant="ghost"
-                size="sm"
-                onClick={onClearSelection}
-                data-testid="clear-selection-btn"
+                className="w-full"
+                onClick={handleSave}
+                disabled={!territoryName.trim() || selectedCounties.size === 0}
+                data-testid="save-territory-btn"
               >
-                <X className="w-3 h-3 mr-1" />
-                Clear
+                <Save className="w-4 h-4 mr-2" />
+                Save Territory
               </Button>
-            )}
-          </div>
-
-          <Button
-            className="w-full"
-            onClick={handleSave}
-            disabled={!territoryName.trim() || selectedCounties.size === 0}
-            data-testid="save-territory-btn"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            Save Territory
-          </Button>
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Territory List */}
@@ -153,11 +206,16 @@ export default function TerritoryPanel({
         <div className="space-y-2">
           {territories.map((t) => {
             const isExpanded = expandedId === t.id;
+            const isBeingEdited = editingTerritoryId === t.id;
 
             return (
               <Card
                 key={t.id}
-                className="p-3 hover:bg-accent/50 transition-colors"
+                className={`p-3 transition-colors ${
+                  isBeingEdited
+                    ? "ring-2 ring-primary bg-accent/50"
+                    : "hover:bg-accent/50"
+                }`}
                 onMouseEnter={() => onHighlightTerritory(t.id)}
                 onMouseLeave={() => onHighlightTerritory(null)}
                 data-testid={`territory-card-${t.id}`}
@@ -168,7 +226,7 @@ export default function TerritoryPanel({
                     style={{ backgroundColor: t.color }}
                   />
 
-                  {editingId === t.id ? (
+                  {editingNameId === t.id ? (
                     <div className="flex-1 flex gap-1">
                       <Input
                         value={editName}
@@ -177,7 +235,7 @@ export default function TerritoryPanel({
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             onUpdateTerritory(t.id, { name: editName });
-                            setEditingId(null);
+                            setEditingNameId(null);
                           }
                         }}
                         data-testid="edit-name-input"
@@ -188,7 +246,7 @@ export default function TerritoryPanel({
                         className="h-7 px-2"
                         onClick={() => {
                           onUpdateTerritory(t.id, { name: editName });
-                          setEditingId(null);
+                          setEditingNameId(null);
                         }}
                         data-testid="confirm-edit-btn"
                       >
@@ -198,7 +256,7 @@ export default function TerritoryPanel({
                         size="sm"
                         variant="ghost"
                         className="h-7 px-2"
-                        onClick={() => setEditingId(null)}
+                        onClick={() => setEditingNameId(null)}
                       >
                         <X className="w-3 h-3" />
                       </Button>
@@ -212,12 +270,12 @@ export default function TerritoryPanel({
                         variant="outline"
                         className="text-xs flex-shrink-0"
                       >
-                        {t.countyFips.length}
+                        {isBeingEdited ? selectedCounties.size : t.countyFips.length}
                       </Badge>
                     </>
                   )}
 
-                  {editingId !== t.id && (
+                  {editingNameId !== t.id && (
                     <div className="flex gap-0.5">
                       <Button
                         size="sm"
@@ -239,9 +297,27 @@ export default function TerritoryPanel({
                         variant="ghost"
                         className="h-7 w-7 p-0"
                         onClick={() => {
-                          setEditingId(t.id);
+                          if (isBeingEdited) {
+                            // Already editing counties, cancel
+                            onCancelEditCounties();
+                          } else {
+                            onEditTerritoryCounties(t.id);
+                          }
+                        }}
+                        title="Edit counties"
+                        data-testid={`edit-counties-${t.id}`}
+                      >
+                        <Pencil className={`w-3 h-3 ${isBeingEdited ? "text-primary" : ""}`} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        onClick={() => {
+                          setEditingNameId(t.id);
                           setEditName(t.name);
                         }}
+                        title="Rename"
                         data-testid={`edit-territory-${t.id}`}
                       >
                         <Edit2 className="w-3 h-3" />

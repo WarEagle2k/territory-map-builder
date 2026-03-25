@@ -17,6 +17,7 @@ interface TerritoryMapProps {
   onCountyHover: (info: { fips: string; name: string; state: string } | null) => void;
   onCountiesDrag: (fipsList: string[]) => void;
   highlightTerritoryId: number | null;
+  editingTerritoryId: number | null;
 }
 
 export default function TerritoryMap({
@@ -27,6 +28,7 @@ export default function TerritoryMap({
   onCountyHover,
   onCountiesDrag,
   highlightTerritoryId,
+  editingTerritoryId,
 }: TerritoryMapProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,16 +78,17 @@ export default function TerritoryMap({
     return () => observer.disconnect();
   }, []);
 
-  // Build a county→territory lookup
+  // Build a county→territory lookup, excluding the territory being edited
   const countyToTerritory = useCallback(() => {
     const map = new Map<string, { color: string; id: number; name: string }>();
     for (const t of territories) {
+      if (t.id === editingTerritoryId) continue;
       for (const fips of t.countyFips) {
         map.set(fips, { color: t.color, id: t.id, name: t.name });
       }
     }
     return map;
-  }, [territories]);
+  }, [territories, editingTerritoryId]);
 
   // Helper: get FIPS from a county path element
   const getFipsFromElement = (el: Element | null): string | null => {

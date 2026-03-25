@@ -1,9 +1,10 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import TerritoryMap from "@/components/TerritoryMap";
 import TerritoryPanel from "@/components/TerritoryPanel";
 import MapLegend from "@/components/MapLegend";
 import { PerplexityAttribution } from "@/components/PerplexityAttribution";
-import { Map, PanelLeftClose, PanelLeft, Download, Upload } from "lucide-react";
+import { Map, PanelLeftClose, PanelLeft, Download, Upload, FileDown } from "lucide-react";
+import { exportTerritoryPDF } from "@/lib/export-pdf";
 import { Button } from "@/components/ui/button";
 import { TERRITORY_COLORS } from "@/lib/territory-colors";
 
@@ -39,6 +40,7 @@ export default function Home() {
   );
   const [panelOpen, setPanelOpen] = useState(true);
   const [selectedColor, setSelectedColor] = useState(TERRITORY_COLORS[0].value);
+  const [editingTerritoryId, setEditingTerritoryId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load county names
@@ -49,13 +51,17 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  // Build set of all already-assigned county FIPS
-  const assignedCounties = new Set<string>();
-  for (const t of territories) {
-    for (const fips of t.countyFips) {
-      assignedCounties.add(fips);
+  // Build set of all already-assigned county FIPS, excluding the territory being edited
+  const assignedCounties = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of territories) {
+      if (t.id === editingTerritoryId) continue;
+      for (const fips of t.countyFips) {
+        set.add(fips);
+      }
     }
-  }
+    return set;
+  }, [territories, editingTerritoryId]);
 
   const handleCountyClick = useCallback(
     (fips: string) => {
@@ -70,8 +76,7 @@ export default function Home() {
         return next;
       });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [territories]
+    [assignedCounties]
   );
 
   const handleCountyHover = useCallback(
@@ -93,8 +98,7 @@ export default function Home() {
         return next;
       });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [territories]
+    [assignedCounties]
   );
 
   const handleClearSelection = useCallback(() => {
@@ -123,7 +127,47 @@ export default function Home() {
 
   const handleDeleteTerritory = useCallback((id: number) => {
     setTerritories((prev) => prev.filter((t) => t.id !== id));
+    if (editingTerritoryId === id) {
+      setEditingTerritoryId(null);
+      setSelectedCounties(new Set());
+    }
+  }, [editingTerritoryId]);
+
+  // Enter county-edit mode for a saved territory
+  const handleEditTerritoryCounties = useCallback((id: number) => {
+    const territory = territories.find((t) => t.id === id);
+    if (!territory) return;
+    setEditingTerritoryId(id);
+    setSelectedCounties(new Set(territory.countyFips));
+    setSelectedColor(territory.color);
+  }, [territories]);
+
+  // Save county edits back to the territory
+  const handleSaveTerritoryCounties = useCallback(() => {
+    if (editingTerritoryId === null) return;
+    setTerritories((prev) =>
+      prev.map((t) =>
+        t.id === editingTerritoryId
+          ? { ...t, countyFips: Array.from(selectedCounties) }
+          : t
+      )
+    );
+    setEditingTerritoryId(null);
+    setSelectedCounties(new Set());
+  }, [editingTerritoryId, selectedCounties]);
+
+  // Cancel county editing
+  const handleCancelEditCounties = useCallback(() => {
+    setEditingTerritoryId(null);
+    setSelectedCounties(new Set());
   }, []);
+
+  // Export as branded PDF
+  const handleExportPDF = useCallback(() => {
+    const svgEl = document.querySelector("[data-testid='territory-map-svg']") as SVGSVGElement | null;
+    if (!svgEl) return;
+    exportTerritoryPDF(svgEl, territories, countyNames);
+  }, [territories, countyNames]);
 
   // Export territories as JSON file
   const handleExport = useCallback(() => {
@@ -203,15 +247,26 @@ export default function Home() {
           )}
 
           {territories.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleExport}
-              data-testid="export-btn"
-              title="Export territories"
-            >
-              <Download className="w-4 h-4" />
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleExportPDF}
+                data-testid="export-pdf-btn"
+                title="Export as PDF"
+              >
+                <FileDown className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleExport}
+                data-testid="export-btn"
+                title="Export as JSON"
+              >
+                <Download className="w-4 h-4" />
+              </Button>
+            </>
           )}
 
           <Button
@@ -258,6 +313,7 @@ export default function Home() {
             onCountyHover={handleCountyHover}
             onCountiesDrag={handleCountiesDrag}
             highlightTerritoryId={highlightTerritoryId}
+            editingTerritoryId={editingTerritoryId}
           />
           <MapLegend
             territories={territories}
@@ -278,6 +334,10 @@ export default function Home() {
               onCreateTerritory={handleCreateTerritory}
               onUpdateTerritory={handleUpdateTerritory}
               onDeleteTerritory={handleDeleteTerritory}
+              onEditTerritoryCounties={handleEditTerritoryCounties}
+              onSaveTerritoryCounties={handleSaveTerritoryCounties}
+              onCancelEditCounties={handleCancelEditCounties}
+              editingTerritoryId={editingTerritoryId}
               countyNames={countyNames}
             />
           </div>
