@@ -15,6 +15,7 @@ interface TerritoryMapProps {
   selectedColor: string; // the color currently chosen in the panel
   onCountyClick: (fips: string) => void;
   onCountyHover: (info: { fips: string; name: string; state: string } | null) => void;
+  onCountiesDrag: (fipsList: string[]) => void;
   highlightTerritoryId: number | null;
 }
 
@@ -24,6 +25,7 @@ export default function TerritoryMap({
   selectedColor,
   onCountyClick,
   onCountyHover,
+  onCountiesDrag,
   highlightTerritoryId,
 }: TerritoryMapProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -35,11 +37,18 @@ export default function TerritoryMap({
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [mapInitialized, setMapInitialized] = useState(false);
 
+  // Drag painting state
+  const isDraggingRef = useRef(false);
+  const draggedCountiesRef = useRef<Set<string>>(new Set());
+  const didDragRef = useRef(false);
+
   // Stable refs for callbacks so D3 event handlers always see latest values
   const onCountyClickRef = useRef(onCountyClick);
   onCountyClickRef.current = onCountyClick;
   const onCountyHoverRef = useRef(onCountyHover);
   onCountyHoverRef.current = onCountyHover;
+  const onCountiesDragRef = useRef(onCountiesDrag);
+  onCountiesDragRef.current = onCountiesDrag;
   const countyNamesRef = useRef(countyNames);
   countyNamesRef.current = countyNames;
 
@@ -78,6 +87,14 @@ export default function TerritoryMap({
     return map;
   }, [territories]);
 
+  // Helper: get FIPS from a county path element
+  const getFipsFromElement = (el: Element | null): string | null => {
+    if (!el) return null;
+    const path = el.closest("path.county");
+    if (!path) return null;
+    return path.getAttribute("data-fips");
+  };
+
   // INITIAL MAP RENDER — runs once when data + dimensions are ready,
   // or when dimensions change (resize). Sets up paths, zoom, event handlers.
   useEffect(() => {
@@ -105,19 +122,18 @@ export default function TerritoryMap({
     const g = svg.append("g");
     gRef.current = g;
 
-    // Zoom — filter out clicks so they don't trigger zoom reset
+    // Zoom — only on scroll wheel, pinch, or right-click/ctrl+click drag
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
       .scaleExtent([1, 12])
       .filter((event) => {
-        // Allow wheel, dblclick, and drag (mousedown+mousemove) for zoom
-        // Block single click from triggering zoom
+        // Allow scroll wheel and pinch for zooming
+        if (event.type === "wheel" || event.type === "dblclick") return true;
+        // Allow right-click drag or ctrl+drag for panning
         if (event.type === "mousedown" || event.type === "touchstart") {
-          // Only allow if it's a middle-click or ctrl+click for panning
-          // D3 default: allow button 0 (left) for panning
-          return true;
+          return event.button === 1 || event.button === 2 || event.ctrlKey || event.metaKey;
         }
-        return true;
+        return false;
       })
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
@@ -125,8 +141,10 @@ export default function TerritoryMap({
     zoomRef.current = zoom;
 
     svg.call(zoom);
+    // Disable default right-click context menu on the SVG
+    svg.on("contextmenu", (event) => event.preventDefault());
 
-    // County paths — fill/stroke set to defaults; updated in the style effect
+    // County paths
     g.selectAll("path.county")
       .data(counties.features)
       .join("path")
@@ -138,21 +156,54 @@ export default function TerritoryMap({
       .attr("stroke", "#94a3b8")
       .attr("stroke-width", 0.5)
       .style("cursor", "pointer")
-      .on("click", (event: any, d: any) => {
-        event.stopPropagation(); // prevent zoom from firing
+      .on("mousedown", (event: MouseEvent, d: any) => {
+        // Only left-click for painting
+        if (event.button !== 0 || event.ctrlKey || event.metaKey) return;
+        event.stopPropagation();
+        event.preventDefault();
+        isDraggingRef.current = true;
+        didDragRef.current = false;
+        draggedCountiesRef.current = new Set();
         const fips = String(d.id).padStart(5, "0");
-        onCountyClickRef.current(fips);
+        draggedCountiesRef.current.add(fips);
       })
-      .on("mouseenter", (_event: any, d: any) => {
+      .on("mouseenter", (event: MouseEvent, d: any) => {
         const fips = String(d.id).padStart(5, "0");
         const info = countyNamesRef.current[fips];
         if (info) {
           onCountyHoverRef.current({ fips, name: info.name, state: info.state });
         }
+        // If dragging, add this county to the drag set
+        if (isDraggingRef.current) {
+          didDragRef.current = true;
+          draggedCountiesRef.current.add(fips);
+          // Immediately fire drag callback so counties light up in real-time
+          onCountiesDragRef.current(Array.from(draggedCountiesRef.current));
+        }
       })
       .on("mouseleave", () => {
         onCountyHoverRef.current(null);
       });
+
+    // Global mouseup to finalize drag selection
+    const handleMouseUp = (event: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+
+      if (didDragRef.current) {
+        // Dragged across multiple counties — commit the drag selection
+        onCountiesDragRef.current(Array.from(draggedCountiesRef.current));
+      } else {
+        // Simple click (no drag movement) — toggle the single county
+        const counties = Array.from(draggedCountiesRef.current);
+        if (counties.length === 1) {
+          onCountyClickRef.current(counties[0]);
+        }
+      }
+      draggedCountiesRef.current = new Set();
+    };
+
+    document.addEventListener("mouseup", handleMouseUp);
 
     // State borders
     g.selectAll("path.state")
@@ -188,10 +239,13 @@ export default function TerritoryMap({
       });
 
     setMapInitialized(true);
+
+    return () => {
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
   }, [topoData, dimensions]);
 
   // STYLE UPDATE — runs whenever territories, selection, color, or highlight changes.
-  // Only updates fill/stroke attributes on existing paths — does NOT recreate geometry or zoom.
   useEffect(() => {
     if (!mapInitialized || !gRef.current) return;
 
@@ -243,6 +297,7 @@ export default function TerritoryMap({
       <svg
         ref={svgRef}
         className="w-full h-full"
+        style={{ userSelect: "none" }}
         data-testid="territory-map-svg"
       />
     </div>

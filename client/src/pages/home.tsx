@@ -81,6 +81,22 @@ export default function Home() {
     []
   );
 
+  const handleCountiesDrag = useCallback(
+    (fipsList: string[]) => {
+      setSelectedCounties((prev) => {
+        const next = new Set(prev);
+        for (const fips of fipsList) {
+          if (!assignedCounties.has(fips)) {
+            next.add(fips);
+          }
+        }
+        return next;
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [territories]
+  );
+
   const handleClearSelection = useCallback(() => {
     setSelectedCounties(new Set());
   }, []);
@@ -240,6 +256,7 @@ export default function Home() {
             selectedColor={selectedColor}
             onCountyClick={handleCountyClick}
             onCountyHover={handleCountyHover}
+            onCountiesDrag={handleCountiesDrag}
             highlightTerritoryId={highlightTerritoryId}
           />
           <MapLegend
