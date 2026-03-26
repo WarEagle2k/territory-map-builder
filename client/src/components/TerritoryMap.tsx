@@ -125,16 +125,16 @@ export default function TerritoryMap({
     const g = svg.append("g");
     gRef.current = g;
 
-    // Zoom — only on scroll wheel, pinch, or right-click/ctrl+click drag
+    // Zoom — scroll wheel for zoom, Shift+drag or right-click drag for panning
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
       .scaleExtent([1, 12])
       .filter((event) => {
         // Allow scroll wheel and pinch for zooming
         if (event.type === "wheel" || event.type === "dblclick") return true;
-        // Allow right-click drag or ctrl+drag for panning
+        // Allow Shift+drag, right-click drag, or ctrl+drag for panning
         if (event.type === "mousedown" || event.type === "touchstart") {
-          return event.button === 1 || event.button === 2 || event.ctrlKey || event.metaKey;
+          return event.button === 1 || event.button === 2 || event.shiftKey || event.ctrlKey || event.metaKey;
         }
         return false;
       })
@@ -160,8 +160,8 @@ export default function TerritoryMap({
       .attr("stroke-width", 0.5)
       .style("cursor", "pointer")
       .on("mousedown", (event: MouseEvent, d: any) => {
-        // Only left-click for painting
-        if (event.button !== 0 || event.ctrlKey || event.metaKey) return;
+        // Only left-click for painting; Shift+drag is reserved for panning
+        if (event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey) return;
         event.stopPropagation();
         event.preventDefault();
         isDraggingRef.current = true;
@@ -303,6 +303,9 @@ export default function TerritoryMap({
         style={{ userSelect: "none" }}
         data-testid="territory-map-svg"
       />
+      <div className="absolute bottom-2 left-2 text-[10px] text-muted-foreground/60 pointer-events-none select-none">
+        Scroll to zoom · Shift+drag to pan · Click or drag to select counties
+      </div>
     </div>
   );
 }
