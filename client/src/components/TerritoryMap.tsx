@@ -35,6 +35,7 @@ export default function TerritoryMap({
   const gRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [topoData, setTopoData] = useState<Topology | null>(null);
+  const [highwayData, setHighwayData] = useState<Topology | null>(null);
   const [countyNames, setCountyNames] = useState<Record<string, CountyInfo>>({});
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [mapInitialized, setMapInitialized] = useState(false);
@@ -59,9 +60,11 @@ export default function TerritoryMap({
     Promise.all([
       fetch("./region-topo.json").then((r) => r.json()),
       fetch("./county-names.json").then((r) => r.json()),
-    ]).then(([topo, names]) => {
+      fetch("./highways-topo.json").then((r) => r.json()),
+    ]).then(([topo, names, highways]) => {
       setTopoData(topo);
       setCountyNames(names);
+      setHighwayData(highways);
     }).catch(() => {});
   }, []);
 
@@ -208,6 +211,37 @@ export default function TerritoryMap({
 
     document.addEventListener("mouseup", handleMouseUp);
 
+    // Highway overlay (interstates) — rendered between counties and state borders
+    // Clip highways to the state boundaries so they don't bleed into whitespace
+    if (highwayData) {
+      const highways = topojson.feature(
+        highwayData as any,
+        (highwayData as any).objects.highways
+      ) as any;
+
+      // Create a clip path from the state outlines
+      const clipId = "states-clip";
+      svg.select("defs").remove();
+      const defs = svg.append("defs");
+      const clipPath = defs.append("clipPath").attr("id", clipId);
+      clipPath.selectAll("path")
+        .data(states.features)
+        .join("path")
+        .attr("d", path as any);
+
+      g.selectAll("path.highway")
+        .data(highways.features)
+        .join("path")
+        .attr("class", "highway")
+        .attr("d", path as any)
+        .attr("fill", "none")
+        .attr("stroke", "#922b21")
+        .attr("stroke-width", 0.5)
+        .attr("stroke-opacity", 0.4)
+        .attr("clip-path", `url(#${clipId})`)
+        .style("pointer-events", "none");
+    }
+
     // State borders
     g.selectAll("path.state")
       .data(states.features)
@@ -246,7 +280,7 @@ export default function TerritoryMap({
     return () => {
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [topoData, dimensions]);
+  }, [topoData, highwayData, dimensions]);
 
   // STYLE UPDATE — runs whenever territories, selection, color, or highlight changes.
   useEffect(() => {
