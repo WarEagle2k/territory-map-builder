@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { HexColorPicker } from "react-colorful";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -15,14 +16,21 @@ import {
   Pencil,
   Check,
 } from "lucide-react";
-import { TERRITORY_COLORS } from "@/lib/territory-colors";
 import type { ClientTerritory } from "@/pages/home";
+
+interface ColorOption {
+  name: string;
+  value: string;
+}
 
 interface TerritoryPanelProps {
   territories: ClientTerritory[];
   selectedCounties: Set<string>;
   selectedColor: string;
+  colors: ColorOption[];
   onColorChange: (color: string) => void;
+  onAddColor: (hex: string) => void;
+  onRemoveColor: (value: string) => void;
   onClearSelection: () => void;
   onHighlightTerritory: (id: number | null) => void;
   onCreateTerritory: (name: string, color: string, counties: string[]) => void;
@@ -39,7 +47,10 @@ export default function TerritoryPanel({
   territories,
   selectedCounties,
   selectedColor,
+  colors,
   onColorChange,
+  onAddColor,
+  onRemoveColor,
   onClearSelection,
   onHighlightTerritory,
   onCreateTerritory,
@@ -55,6 +66,22 @@ export default function TerritoryPanel({
   const [editingNameId, setEditingNameId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [hexInput, setHexInput] = useState("#3b82f6");
+  const [showColorManager, setShowColorManager] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  // Close picker when clicking outside
+  useEffect(() => {
+    if (!showPicker) return;
+    const handleClick = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setShowPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showPicker]);
 
   const handleSave = () => {
     if (!territoryName.trim()) return;
@@ -137,25 +164,94 @@ export default function TerritoryPanel({
               />
 
               <div>
-                <label className="text-xs text-muted-foreground mb-1.5 block">
-                  Color
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs text-muted-foreground">
+                    Color
+                  </label>
+                  <button
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowColorManager(!showColorManager)}
+                  >
+                    {showColorManager ? "Done" : "Manage"}
+                  </button>
+                </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {TERRITORY_COLORS.map((c) => (
-                    <button
-                      key={c.value}
-                      className={`w-6 h-6 rounded-full border-2 transition-transform ${
-                        selectedColor === c.value
-                          ? "border-foreground scale-110"
-                          : "border-transparent hover:scale-105"
-                      } ${usedColors.has(c.value) ? "opacity-30" : ""}`}
-                      style={{ backgroundColor: c.value }}
-                      onClick={() => onColorChange(c.value)}
-                      title={c.name}
-                      data-testid={`color-${c.name.toLowerCase()}`}
-                    />
+                  {colors.map((c) => (
+                    <div key={c.value} className="relative group">
+                      <button
+                        className={`w-6 h-6 rounded-full border-2 transition-transform ${
+                          selectedColor === c.value
+                            ? "border-foreground scale-110"
+                            : "border-transparent hover:scale-105"
+                        } ${usedColors.has(c.value) ? "opacity-30" : ""}`}
+                        style={{ backgroundColor: c.value }}
+                        onClick={() => onColorChange(c.value)}
+                        title={c.name}
+                        data-testid={`color-${c.name.toLowerCase()}`}
+                      />
+                      {showColorManager && !usedColors.has(c.value) && (
+                        <button
+                          className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-destructive text-destructive-foreground rounded-full text-[8px] leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRemoveColor(c.value);
+                          }}
+                          title="Remove color"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
+                {showColorManager && (
+                  <div className="mt-2 space-y-2">
+                    <div className="relative" ref={pickerRef}>
+                      <div className="flex gap-1.5">
+                        <div
+                          className="w-7 h-7 rounded border border-border flex-shrink-0 cursor-pointer"
+                          style={{ backgroundColor: hexInput }}
+                          onClick={() => setShowPicker(!showPicker)}
+                          title="Click to open color picker"
+                        />
+                        <Input
+                          placeholder="#hex color"
+                          value={hexInput}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setHexInput(val);
+                          }}
+                          className="h-7 text-xs flex-1 font-mono"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && /^#?[0-9a-fA-F]{6}$/.test(hexInput.trim())) {
+                              onAddColor(hexInput.trim());
+                            }
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2"
+                          disabled={!/^#?[0-9a-fA-F]{6}$/.test(hexInput.trim())}
+                          onClick={() => {
+                            onAddColor(hexInput.trim());
+                          }}
+                          title="Add color to palette"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      {showPicker && (
+                        <div className="absolute z-50 mt-2 p-3 bg-popover border border-border rounded-lg shadow-lg">
+                          <HexColorPicker
+                            color={hexInput}
+                            onChange={setHexInput}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between">

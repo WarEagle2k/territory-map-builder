@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import TerritoryMap from "@/components/TerritoryMap";
 import TerritoryPanel from "@/components/TerritoryPanel";
 import MapLegend from "@/components/MapLegend";
-import { PerplexityAttribution } from "@/components/PerplexityAttribution";
 import { Map, PanelLeftClose, PanelLeft, Download, Upload, FileDown } from "lucide-react";
 import { exportTerritoryPDF } from "@/lib/export-pdf";
 import { Button } from "@/components/ui/button";
@@ -39,9 +38,28 @@ export default function Home() {
     {}
   );
   const [panelOpen, setPanelOpen] = useState(true);
+  const [colors, setColors] = useState(TERRITORY_COLORS);
   const [selectedColor, setSelectedColor] = useState(TERRITORY_COLORS[0].value);
   const [editingTerritoryId, setEditingTerritoryId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAddColor = useCallback((hex: string) => {
+    // Normalize to lowercase with #
+    const normalized = hex.startsWith("#") ? hex.toLowerCase() : `#${hex.toLowerCase()}`;
+    if (colors.some((c) => c.value.toLowerCase() === normalized)) return;
+    setColors((prev) => [...prev, { name: normalized.toUpperCase(), value: normalized }]);
+  }, [colors]);
+
+  const handleRemoveColor = useCallback((value: string) => {
+    setColors((prev) => prev.filter((c) => c.value !== value));
+    // If the removed color was selected, switch to first available
+    if (selectedColor === value) {
+      setSelectedColor((prev) => {
+        const remaining = colors.filter((c) => c.value !== value);
+        return remaining.length > 0 ? remaining[0].value : prev;
+      });
+    }
+  }, [colors, selectedColor]);
 
   // Load county names
   useEffect(() => {
@@ -328,7 +346,10 @@ export default function Home() {
               territories={territories}
               selectedCounties={selectedCounties}
               selectedColor={selectedColor}
+              colors={colors}
               onColorChange={setSelectedColor}
+              onAddColor={handleAddColor}
+              onRemoveColor={handleRemoveColor}
               onClearSelection={handleClearSelection}
               onHighlightTerritory={setHighlightTerritoryId}
               onCreateTerritory={handleCreateTerritory}
@@ -344,10 +365,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* Footer */}
-      <footer className="h-8 border-t border-border flex items-center justify-center flex-shrink-0">
-        <PerplexityAttribution />
-      </footer>
     </div>
   );
 }

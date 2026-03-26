@@ -6,13 +6,8 @@ interface CountyInfo {
   state: string;
 }
 
-// Convert SVG element to a PNG data URL via canvas
-async function svgToImage(svgEl: SVGSVGElement): Promise<string> {
-  // Get the viewBox dimensions — this is the actual coordinate space of the map
-  const viewBox = svgEl.viewBox.baseVal;
-  const vbWidth = viewBox.width || svgEl.clientWidth;
-  const vbHeight = viewBox.height || svgEl.clientHeight;
-
+// Convert SVG element to a PNG data URL via canvas, cropped to the map content
+async function svgToImage(svgEl: SVGSVGElement): Promise<{ dataUrl: string; width: number; height: number }> {
   // Clone the SVG so we can modify it without affecting the live DOM
   const clone = svgEl.cloneNode(true) as SVGSVGElement;
 
@@ -22,9 +17,35 @@ async function svgToImage(svgEl: SVGSVGElement): Promise<string> {
     gEl.setAttribute("transform", "");
   }
 
-  // Set explicit width/height attributes so the image renders at the right size
-  clone.setAttribute("width", String(vbWidth));
-  clone.setAttribute("height", String(vbHeight));
+  // Get the bounding box of all the path elements (the actual map content)
+  // We need to do this on the live SVG before zoom is applied
+  const liveG = svgEl.querySelector("g");
+  let bbox: { x: number; y: number; width: number; height: number };
+
+  if (liveG) {
+    // Temporarily reset zoom to get the un-zoomed bounding box
+    const origTransform = liveG.getAttribute("transform") || "";
+    liveG.setAttribute("transform", "");
+    const liveBBox = liveG.getBBox();
+    liveG.setAttribute("transform", origTransform);
+
+    // Add a small padding around the content
+    const pad = 10;
+    bbox = {
+      x: liveBBox.x - pad,
+      y: liveBBox.y - pad,
+      width: liveBBox.width + pad * 2,
+      height: liveBBox.height + pad * 2,
+    };
+  } else {
+    const viewBox = svgEl.viewBox.baseVal;
+    bbox = { x: 0, y: 0, width: viewBox.width || svgEl.clientWidth, height: viewBox.height || svgEl.clientHeight };
+  }
+
+  // Set the viewBox to the tight bounding box so we only capture the map content
+  clone.setAttribute("viewBox", `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`);
+  clone.setAttribute("width", String(bbox.width));
+  clone.setAttribute("height", String(bbox.height));
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
 
   const svgData = new XMLSerializer().serializeToString(clone);
@@ -37,15 +58,15 @@ async function svgToImage(svgEl: SVGSVGElement): Promise<string> {
       // Use a high-res canvas for crisp output
       const scale = 3;
       const canvas = document.createElement("canvas");
-      canvas.width = vbWidth * scale;
-      canvas.height = vbHeight * scale;
+      canvas.width = bbox.width * scale;
+      canvas.height = bbox.height * scale;
       const ctx = canvas.getContext("2d")!;
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.scale(scale, scale);
-      ctx.drawImage(img, 0, 0, vbWidth, vbHeight);
+      ctx.drawImage(img, 0, 0, bbox.width, bbox.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/png"));
+      resolve({ dataUrl: canvas.toDataURL("image/png"), width: bbox.width, height: bbox.height });
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
@@ -130,60 +151,58 @@ export async function exportTerritoryPDF(
   pdf.setFillColor(...gold);
   pdf.rect(0, 25, pageW, 1.5, "F");
 
-  // --- MAP ---
+  // --- LAYOUT: full-width map on top, key grid below ---
   const mapTop = 28;
-  const keyWidth = 70;
-  // Give the map the full width minus just the key column
-  const mapAreaWidth = pageW - margin - keyWidth - 6;
-  const mapAreaHeight = pageH - mapTop - 12; // leave room for footer
+  const keyHeight = 30; // reserve space at bottom for key
+  const footerHeight = 8;
+  const mapAreaWidth = pageW - margin * 2;
+  const mapAreaHeight = pageH - mapTop - keyHeight - footerHeight;
+
+  let mapBottomY = mapTop + mapAreaHeight; // where the map ends
 
   try {
-    const mapImage = await svgToImage(svgEl);
-    // Calculate aspect ratio to fit within the available area
-    const svgAspect = svgEl.viewBox.baseVal.width / svgEl.viewBox.baseVal.height;
+    const { dataUrl: mapImage, width: cropW, height: cropH } = await svgToImage(svgEl);
+    const mapAspect = cropW / cropH;
     let drawW = mapAreaWidth;
-    let drawH = drawW / svgAspect;
+    let drawH = drawW / mapAspect;
     if (drawH > mapAreaHeight) {
       drawH = mapAreaHeight;
-      drawW = drawH * svgAspect;
+      drawW = drawH * mapAspect;
     }
-    // Left-align the map with a small margin
-    const mapX = margin / 2;
+    // Center the map horizontally
+    const mapX = (pageW - drawW) / 2;
     const mapY = mapTop + (mapAreaHeight - drawH) / 2;
     pdf.addImage(mapImage, "PNG", mapX, mapY, drawW, drawH);
+    mapBottomY = mapY + drawH;
   } catch {
     pdf.setTextColor(150, 150, 150);
     pdf.setFontSize(12);
-    pdf.text("Map could not be rendered", margin + mapWidth / 2, mapTop + mapHeight / 2, {
+    pdf.text("Map could not be rendered", pageW / 2, mapTop + mapAreaHeight / 2, {
       align: "center",
     });
   }
 
-  // --- TERRITORY KEY ---
-  const keyX = pageW - margin - keyWidth;
-  const keyTop = mapTop;
+  // --- TERRITORY KEY (horizontal grid below map) ---
+  const keyTop = mapBottomY + 4;
 
-  // Key header
+  // Key header bar — full width
   pdf.setFillColor(...deepTeal);
-  pdf.roundedRect(keyX, keyTop, keyWidth, 8, 2, 2, "F");
+  pdf.roundedRect(margin, keyTop, pageW - margin * 2, 7, 2, 2, "F");
   pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(10);
+  pdf.setFontSize(9);
   pdf.setFont("helvetica", "bold");
-  pdf.text("TERRITORY KEY", keyX + keyWidth / 2, keyTop + 5.5, { align: "center" });
+  pdf.text("TERRITORY KEY", pageW / 2, keyTop + 4.8, { align: "center" });
 
-  // Key entries
-  let keyY = keyTop + 13;
-  pdf.setFontSize(8);
+  // Arrange territories in a multi-column grid
+  const cols = Math.min(territories.length, 4); // up to 4 columns
+  const colWidth = (pageW - margin * 2) / cols;
+  const entryTop = keyTop + 10;
 
-  for (const t of territories) {
-    // Check if we need a new page
-    if (keyY + 8 > pageH - 15) {
-      // Just stop — in practice, the key should fit
-      pdf.setTextColor(100, 100, 100);
-      pdf.setFont("helvetica", "italic");
-      pdf.text("... and more", keyX + 4, keyY + 3);
-      break;
-    }
+  territories.forEach((t, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = margin + col * colWidth;
+    const y = entryTop + row * 9;
 
     // Color swatch
     const hex = t.color;
@@ -191,25 +210,27 @@ export async function exportTerritoryPDF(
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
     pdf.setFillColor(r, g, b);
-    pdf.roundedRect(keyX + 2, keyY, 5, 5, 1, 1, "F");
+    pdf.roundedRect(x, y, 4, 4, 0.8, 0.8, "F");
 
-    // Territory name
+    // Territory name and county count
     pdf.setTextColor(30, 30, 30);
     pdf.setFont("helvetica", "bold");
-    pdf.text(t.name, keyX + 10, keyY + 3.5);
+    pdf.setFontSize(9);
+    // Truncate long names to fit column
+    let name = t.name;
+    if (pdf.getTextWidth(name) > colWidth - 14) {
+      while (pdf.getTextWidth(name + "...") > colWidth - 14 && name.length > 0) {
+        name = name.slice(0, -1);
+      }
+      name += "...";
+    }
+    pdf.text(name, x + 7, y + 3.5);
 
-    // County count
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(100, 100, 100);
-    pdf.text(`${t.countyFips.length} counties`, keyX + 10, keyY + 7.5);
-
-    keyY += 12;
-
-    // Subtle separator
-    pdf.setDrawColor(200, 200, 200);
-    pdf.setLineWidth(0.2);
-    pdf.line(keyX + 2, keyY - 2, keyX + keyWidth - 2, keyY - 2);
-  }
+    pdf.setFontSize(7.5);
+    pdf.text(`${t.countyFips.length} counties`, x + 7, y + 7);
+  });
 
   // --- FOOTER ---
   pdf.setFillColor(...gold);
