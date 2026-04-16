@@ -269,11 +269,8 @@ export default function TerritoryMap({
     if (cities.length > 0) {
       const cityGroup = g.append("g").attr("class", "cities-layer");
 
-      const tierStyle = (t: 1 | 2 | 3) => {
-        if (t === 1) return { r: 1.8, fs: 8, fw: 400, opacity: 0.9 };
-        if (t === 2) return { r: 1.4, fs: 7, fw: 400, opacity: 0.75 };
-        return { r: 1.0, fs: 6, fw: 400, opacity: 0.6 };
-      };
+      // Uniform style for every city — no tier-based emphasis
+      const tierStyle = (_t: 1 | 2 | 3) => ({ r: 1.0, fs: 6, fw: 400, opacity: 0.6 });
 
       cityGroup
         .selectAll("g.city")
