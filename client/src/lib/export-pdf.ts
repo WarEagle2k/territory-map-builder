@@ -26,16 +26,27 @@ async function svgToImage(svgEl: SVGSVGElement): Promise<{ dataUrl: string; widt
     // Temporarily reset zoom to get the un-zoomed bounding box
     const origTransform = liveG.getAttribute("transform") || "";
     liveG.setAttribute("transform", "");
-    const liveBBox = liveG.getBBox();
+
+    // Only measure county and state paths (not highways, which extend beyond visible area)
+    const mapPaths = liveG.querySelectorAll("path.county, path.state");
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    mapPaths.forEach((el) => {
+      const b = (el as SVGPathElement).getBBox();
+      minX = Math.min(minX, b.x);
+      minY = Math.min(minY, b.y);
+      maxX = Math.max(maxX, b.x + b.width);
+      maxY = Math.max(maxY, b.y + b.height);
+    });
+
     liveG.setAttribute("transform", origTransform);
 
     // Add a small padding around the content
     const pad = 10;
     bbox = {
-      x: liveBBox.x - pad,
-      y: liveBBox.y - pad,
-      width: liveBBox.width + pad * 2,
-      height: liveBBox.height + pad * 2,
+      x: minX - pad,
+      y: minY - pad,
+      width: (maxX - minX) + pad * 2,
+      height: (maxY - minY) + pad * 2,
     };
   } else {
     const viewBox = svgEl.viewBox.baseVal;
@@ -153,7 +164,7 @@ export async function exportTerritoryPDF(
 
   // --- LAYOUT: full-width map on top, key grid below ---
   const mapTop = 28;
-  const keyHeight = 30; // reserve space at bottom for key
+  const keyHeight = 25; // reserve space at bottom for key
   const footerHeight = 8;
   const mapAreaWidth = pageW - margin * 2;
   const mapAreaHeight = pageH - mapTop - keyHeight - footerHeight;
@@ -202,7 +213,7 @@ export async function exportTerritoryPDF(
     const col = i % cols;
     const row = Math.floor(i / cols);
     const x = margin + col * colWidth;
-    const y = entryTop + row * 9;
+    const y = entryTop + row * 7;
 
     // Color swatch
     const hex = t.color;
@@ -212,10 +223,10 @@ export async function exportTerritoryPDF(
     pdf.setFillColor(r, g, b);
     pdf.roundedRect(x, y, 4, 4, 0.8, 0.8, "F");
 
-    // Territory name and county count
+    // Territory name
     pdf.setTextColor(30, 30, 30);
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(9);
+    pdf.setFontSize(11);
     // Truncate long names to fit column
     let name = t.name;
     if (pdf.getTextWidth(name) > colWidth - 14) {
@@ -225,11 +236,6 @@ export async function exportTerritoryPDF(
       name += "...";
     }
     pdf.text(name, x + 7, y + 3.5);
-
-    pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(100, 100, 100);
-    pdf.setFontSize(7.5);
-    pdf.text(`${t.countyFips.length} counties`, x + 7, y + 7);
   });
 
   // --- FOOTER ---

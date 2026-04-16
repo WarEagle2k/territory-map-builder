@@ -12,13 +12,26 @@ interface CountyInfo {
 interface TerritoryMapProps {
   territories: ClientTerritory[];
   selectedCounties: Set<string>;
-  selectedColor: string; // the color currently chosen in the panel
+  selectedColor: string;
   onCountyClick: (fips: string) => void;
   onCountyHover: (info: { fips: string; name: string; state: string } | null) => void;
   onCountiesDrag: (fipsList: string[]) => void;
   highlightTerritoryId: number | null;
   editingTerritoryId: number | null;
 }
+
+// Only 2-digit state FIPS codes are present in our dataset; keep this table
+// next to the rendering code so it's easy to extend when we grow the region.
+const STATE_ABBR: Record<string, string> = {
+  "48": "TX",
+  "22": "LA",
+  "28": "MS",
+  "01": "AL",
+  "05": "AR",
+  "40": "OK",
+  "47": "TN",
+  "12": "FL",
+};
 
 export default function TerritoryMap({
   territories,
@@ -33,19 +46,19 @@ export default function TerritoryMap({
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const gRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
-  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const pathRef = useRef<d3.GeoPath | null>(null);
   const [topoData, setTopoData] = useState<Topology | null>(null);
   const [highwayData, setHighwayData] = useState<Topology | null>(null);
   const [countyNames, setCountyNames] = useState<Record<string, CountyInfo>>({});
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  const [mapInitialized, setMapInitialized] = useState(false);
+  const [geometryReady, setGeometryReady] = useState(false);
 
   // Drag painting state
   const isDraggingRef = useRef(false);
   const draggedCountiesRef = useRef<Set<string>>(new Set());
   const didDragRef = useRef(false);
 
-  // Stable refs for callbacks so D3 event handlers always see latest values
+  // Stable refs so D3 handlers always see latest callbacks
   const onCountyClickRef = useRef(onCountyClick);
   onCountyClickRef.current = onCountyClick;
   const onCountyHoverRef = useRef(onCountyHover);
@@ -55,20 +68,22 @@ export default function TerritoryMap({
   const countyNamesRef = useRef(countyNames);
   countyNamesRef.current = countyNames;
 
-  // Load data
+  // --- Load static data ---
   useEffect(() => {
     Promise.all([
       fetch("./region-topo.json").then((r) => r.json()),
       fetch("./county-names.json").then((r) => r.json()),
       fetch("./highways-topo.json").then((r) => r.json()),
-    ]).then(([topo, names, highways]) => {
-      setTopoData(topo);
-      setCountyNames(names);
-      setHighwayData(highways);
-    }).catch(() => {});
+    ])
+      .then(([topo, names, highways]) => {
+        setTopoData(topo);
+        setCountyNames(names);
+        setHighwayData(highways);
+      })
+      .catch(() => {});
   }, []);
 
-  // Responsive resize
+  // --- Responsive resize ---
   useEffect(() => {
     if (!containerRef.current) return;
     const observer = new ResizeObserver((entries) => {
@@ -81,7 +96,7 @@ export default function TerritoryMap({
     return () => observer.disconnect();
   }, []);
 
-  // Build a county→territory lookup, excluding the territory being edited
+  // --- Build county→territory lookup ---
   const countyToTerritory = useCallback(() => {
     const map = new Map<string, { color: string; id: number; name: string }>();
     for (const t of territories) {
@@ -93,61 +108,58 @@ export default function TerritoryMap({
     return map;
   }, [territories, editingTerritoryId]);
 
-  // Helper: get FIPS from a county path element
-  const getFipsFromElement = (el: Element | null): string | null => {
-    if (!el) return null;
-    const path = el.closest("path.county");
-    if (!path) return null;
-    return path.getAttribute("data-fips");
-  };
-
-  // INITIAL MAP RENDER — runs once when data + dimensions are ready,
-  // or when dimensions change (resize). Sets up paths, zoom, event handlers.
+  // --- GEOMETRY BUILD — runs once when data is available ---
+  // Creates all SVG paths, zoom, and event handlers. Projection sized to the
+  // CURRENT dimensions; resize is handled by a separate effect that just
+  // re-runs path `d` attributes.
   useEffect(() => {
     if (!topoData || !svgRef.current) return;
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
+    const counties = topojson.feature(
+      topoData,
+      topoData.objects.counties
+    ) as unknown as GeoJSON.FeatureCollection;
+    const states = topojson.feature(
+      topoData,
+      topoData.objects.states
+    ) as unknown as GeoJSON.FeatureCollection;
+
     const { width, height } = dimensions;
     svg.attr("viewBox", `0 0 ${width} ${height}`);
 
-    const counties = topojson.feature(
-      topoData as any,
-      (topoData as any).objects.counties
-    ) as any;
-    const states = topojson.feature(
-      topoData as any,
-      (topoData as any).objects.states
-    ) as any;
-
     const projection = d3.geoAlbersUsa().fitSize([width, height], counties);
     const path = d3.geoPath().projection(projection);
+    pathRef.current = path;
 
     // Map group
     const g = svg.append("g");
     gRef.current = g;
 
-    // Zoom — scroll wheel for zoom, Shift+drag or right-click drag for panning
+    // Zoom: scroll to zoom, Shift+drag / right-click drag / ctrl+drag to pan
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
       .scaleExtent([1, 12])
       .filter((event) => {
-        // Allow scroll wheel and pinch for zooming
         if (event.type === "wheel" || event.type === "dblclick") return true;
-        // Allow Shift+drag, right-click drag, or ctrl+drag for panning
         if (event.type === "mousedown" || event.type === "touchstart") {
-          return event.button === 1 || event.button === 2 || event.shiftKey || event.ctrlKey || event.metaKey;
+          return (
+            event.button === 1 ||
+            event.button === 2 ||
+            event.shiftKey ||
+            event.ctrlKey ||
+            event.metaKey
+          );
         }
         return false;
       })
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
       });
-    zoomRef.current = zoom;
 
     svg.call(zoom);
-    // Disable default right-click context menu on the SVG
     svg.on("contextmenu", (event) => event.preventDefault());
 
     // County paths
@@ -155,15 +167,14 @@ export default function TerritoryMap({
       .data(counties.features)
       .join("path")
       .attr("class", "county")
-      .attr("d", path as any)
-      .attr("data-fips", (d: any) => String(d.id).padStart(5, "0"))
-      .attr("data-testid", (d: any) => `county-${String(d.id).padStart(5, "0")}`)
+      .attr("d", path)
+      .attr("data-fips", (d) => String(d.id).padStart(5, "0"))
+      .attr("data-testid", (d) => `county-${String(d.id).padStart(5, "0")}`)
       .attr("fill", "#e2e8f0")
       .attr("stroke", "#94a3b8")
       .attr("stroke-width", 0.5)
       .style("cursor", "pointer")
-      .on("mousedown", (event: MouseEvent, d: any) => {
-        // Only left-click for painting; Shift+drag is reserved for panning
+      .on("mousedown", (event: MouseEvent, d) => {
         if (event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey) return;
         event.stopPropagation();
         event.preventDefault();
@@ -173,17 +184,15 @@ export default function TerritoryMap({
         const fips = String(d.id).padStart(5, "0");
         draggedCountiesRef.current.add(fips);
       })
-      .on("mouseenter", (event: MouseEvent, d: any) => {
+      .on("mouseenter", (_event: MouseEvent, d) => {
         const fips = String(d.id).padStart(5, "0");
         const info = countyNamesRef.current[fips];
         if (info) {
           onCountyHoverRef.current({ fips, name: info.name, state: info.state });
         }
-        // If dragging, add this county to the drag set
         if (isDraggingRef.current) {
           didDragRef.current = true;
           draggedCountiesRef.current.add(fips);
-          // Immediately fire drag callback so counties light up in real-time
           onCountiesDragRef.current(Array.from(draggedCountiesRef.current));
         }
       })
@@ -191,49 +200,40 @@ export default function TerritoryMap({
         onCountyHoverRef.current(null);
       });
 
-    // Global mouseup to finalize drag selection
-    const handleMouseUp = (event: MouseEvent) => {
+    const handleMouseUp = () => {
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
-
       if (didDragRef.current) {
-        // Dragged across multiple counties — commit the drag selection
         onCountiesDragRef.current(Array.from(draggedCountiesRef.current));
       } else {
-        // Simple click (no drag movement) — toggle the single county
-        const counties = Array.from(draggedCountiesRef.current);
-        if (counties.length === 1) {
-          onCountyClickRef.current(counties[0]);
-        }
+        const ids = Array.from(draggedCountiesRef.current);
+        if (ids.length === 1) onCountyClickRef.current(ids[0]);
       }
       draggedCountiesRef.current = new Set();
     };
-
     document.addEventListener("mouseup", handleMouseUp);
 
-    // Highway overlay (interstates) — rendered between counties and state borders
-    // Clip highways to the state boundaries so they don't bleed into whitespace
+    // Highway overlay, clipped to state boundaries
     if (highwayData) {
       const highways = topojson.feature(
-        highwayData as any,
-        (highwayData as any).objects.highways
-      ) as any;
+        highwayData,
+        highwayData.objects.highways
+      ) as unknown as GeoJSON.FeatureCollection;
 
-      // Create a clip path from the state outlines
       const clipId = "states-clip";
-      svg.select("defs").remove();
       const defs = svg.append("defs");
       const clipPath = defs.append("clipPath").attr("id", clipId);
-      clipPath.selectAll("path")
+      clipPath
+        .selectAll("path")
         .data(states.features)
         .join("path")
-        .attr("d", path as any);
+        .attr("d", path);
 
       g.selectAll("path.highway")
         .data(highways.features)
         .join("path")
         .attr("class", "highway")
-        .attr("d", path as any)
+        .attr("d", path)
         .attr("fill", "none")
         .attr("stroke", "#922b21")
         .attr("stroke-width", 0.5)
@@ -247,7 +247,7 @@ export default function TerritoryMap({
       .data(states.features)
       .join("path")
       .attr("class", "state")
-      .attr("d", path as any)
+      .attr("d", path)
       .attr("fill", "none")
       .attr("stroke", "#475569")
       .attr("stroke-width", 1.5)
@@ -258,8 +258,8 @@ export default function TerritoryMap({
       .data(states.features)
       .join("text")
       .attr("class", "state-label")
-      .attr("x", (d: any) => path.centroid(d)[0])
-      .attr("y", (d: any) => path.centroid(d)[1])
+      .attr("x", (d) => path.centroid(d)[0])
+      .attr("y", (d) => path.centroid(d)[1])
       .attr("text-anchor", "middle")
       .attr("dominant-baseline", "middle")
       .attr("font-size", "12px")
@@ -267,37 +267,59 @@ export default function TerritoryMap({
       .attr("fill", "#334155")
       .attr("opacity", 0.5)
       .style("pointer-events", "none")
-      .text((d: any) => {
-        const stateAbbr: Record<string, string> = {
-          "48": "TX", "22": "LA", "28": "MS", "01": "AL",
-          "05": "AR", "40": "OK", "47": "TN", "12": "FL",
-        };
-        return stateAbbr[String(d.id).padStart(2, "0")] || "";
-      });
+      .text((d) => STATE_ABBR[String(d.id).padStart(2, "0")] || "");
 
-    setMapInitialized(true);
+    setGeometryReady(true);
 
     return () => {
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [topoData, highwayData, dimensions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topoData, highwayData]); // NOTE: dimensions intentionally excluded — resize handled below
 
-  // STYLE UPDATE — runs whenever territories, selection, color, or highlight changes.
+  // --- RESIZE — re-project and update path `d` without rebuilding DOM ---
   useEffect(() => {
-    if (!mapInitialized || !gRef.current) return;
+    if (!geometryReady || !gRef.current || !topoData || !svgRef.current) return;
+
+    const svg = d3.select(svgRef.current);
+    const { width, height } = dimensions;
+    svg.attr("viewBox", `0 0 ${width} ${height}`);
+
+    const counties = topojson.feature(
+      topoData,
+      topoData.objects.counties
+    ) as unknown as GeoJSON.FeatureCollection;
+    const projection = d3.geoAlbersUsa().fitSize([width, height], counties);
+    const path = d3.geoPath().projection(projection);
+    pathRef.current = path;
+
+    const g = gRef.current;
+    g.selectAll<SVGPathElement, GeoJSON.Feature>("path.county").attr("d", path);
+    g.selectAll<SVGPathElement, GeoJSON.Feature>("path.state").attr("d", path);
+    g.selectAll<SVGPathElement, GeoJSON.Feature>("path.highway").attr("d", path);
+    // Clip path lives under svg > defs, not inside g
+    svg
+      .select("defs > clipPath")
+      .selectAll<SVGPathElement, GeoJSON.Feature>("path")
+      .attr("d", path);
+    g.selectAll<SVGTextElement, GeoJSON.Feature>("text.state-label")
+      .attr("x", (d) => path.centroid(d)[0])
+      .attr("y", (d) => path.centroid(d)[1]);
+  }, [dimensions, geometryReady, topoData]);
+
+  // --- STYLE UPDATE — fill/stroke on selection / territory / highlight changes ---
+  useEffect(() => {
+    if (!geometryReady || !gRef.current) return;
 
     const g = gRef.current;
     const ctMap = countyToTerritory();
 
-    g.selectAll<SVGPathElement, any>("path.county")
+    g.selectAll<SVGPathElement, GeoJSON.Feature>("path.county")
       .attr("fill", function () {
         const fips = d3.select(this).attr("data-fips");
-        if (selectedCounties.has(fips)) {
-          return selectedColor;
-        }
+        if (selectedCounties.has(fips)) return selectedColor;
         const territory = ctMap.get(fips);
-        if (territory) return territory.color;
-        return "#e2e8f0";
+        return territory ? territory.color : "#e2e8f0";
       })
       .attr("stroke", function () {
         const fips = d3.select(this).attr("data-fips");
@@ -317,11 +339,10 @@ export default function TerritoryMap({
         const fips = d3.select(this).attr("data-fips");
         if (selectedCounties.has(fips)) return 0.6;
         const territory = ctMap.get(fips);
-        if (territory) return 0.75;
-        return 1;
+        return territory ? 0.75 : 1;
       });
   }, [
-    mapInitialized,
+    geometryReady,
     territories,
     selectedCounties,
     selectedColor,
