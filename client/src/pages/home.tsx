@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import TerritoryMap from "@/components/TerritoryMap";
+import TerritoryMapLeaflet from "@/components/TerritoryMapLeaflet";
 import TerritoryPanel from "@/components/TerritoryPanel";
 import MapLegend from "@/components/MapLegend";
-import { Map, PanelLeftClose, PanelLeft, Download, Upload, FileDown, Trash2 } from "lucide-react";
+import { Map, PanelLeftClose, PanelLeft, Download, Upload, FileDown, Trash2, Layers } from "lucide-react";
 import { exportTerritoryPDF } from "@/lib/export-pdf";
 import { Button } from "@/components/ui/button";
 import { TERRITORY_COLORS } from "@/lib/territory-colors";
@@ -52,6 +53,12 @@ export default function Home() {
   const [highlightTerritoryId, setHighlightTerritoryId] = useState<number | null>(null);
   const [countyNames, setCountyNames] = useState<Record<string, CountyInfo>>({});
   const [panelOpen, setPanelOpen] = useState(true);
+  const [mapVariant, setMapVariant] = useState<"classic" | "tiles">(
+    () => (window.localStorage.getItem("tmb:mapVariant") === "tiles" ? "tiles" : "classic")
+  );
+  useEffect(() => {
+    window.localStorage.setItem("tmb:mapVariant", mapVariant);
+  }, [mapVariant]);
   const [selectedColor, setSelectedColor] = useState(colors[0]?.value ?? "#3b82f6");
   const [editingTerritoryId, setEditingTerritoryId] = useState<number | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -348,6 +355,23 @@ export default function Home() {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() =>
+              setMapVariant((v) => (v === "classic" ? "tiles" : "classic"))
+            }
+            data-testid="toggle-map-variant-btn"
+            title={
+              mapVariant === "classic"
+                ? "Switch to tiled map (CARTO)"
+                : "Switch to classic map"
+            }
+            className={mapVariant === "tiles" ? "text-primary" : ""}
+          >
+            <Layers className="w-4 h-4" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => fileInputRef.current?.click()}
             data-testid="import-btn"
             title="Import territories"
@@ -391,16 +415,29 @@ export default function Home() {
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 relative">
-          <TerritoryMap
-            territories={territories}
-            selectedCounties={selectedCounties}
-            selectedColor={selectedColor}
-            onCountyClick={handleCountyClick}
-            onCountyHover={handleCountyHover}
-            onCountiesDrag={handleCountiesDrag}
-            highlightTerritoryId={highlightTerritoryId}
-            editingTerritoryId={editingTerritoryId}
-          />
+          {mapVariant === "classic" ? (
+            <TerritoryMap
+              territories={territories}
+              selectedCounties={selectedCounties}
+              selectedColor={selectedColor}
+              onCountyClick={handleCountyClick}
+              onCountyHover={handleCountyHover}
+              onCountiesDrag={handleCountiesDrag}
+              highlightTerritoryId={highlightTerritoryId}
+              editingTerritoryId={editingTerritoryId}
+            />
+          ) : (
+            <TerritoryMapLeaflet
+              territories={territories}
+              selectedCounties={selectedCounties}
+              selectedColor={selectedColor}
+              onCountyClick={handleCountyClick}
+              onCountyHover={handleCountyHover}
+              onCountiesDrag={handleCountiesDrag}
+              highlightTerritoryId={highlightTerritoryId}
+              editingTerritoryId={editingTerritoryId}
+            />
+          )}
           <MapLegend
             territories={territories}
             onHighlight={setHighlightTerritoryId}

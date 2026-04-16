@@ -28,4 +28,10 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
+  optimizeDeps: {
+    // canvg & fflate are optional jspdf peer deps used for niche features
+    // (SVG rendering & PDF compression). We don't use them — exclude from
+    // Vite's dep scanner so missing core-js submodules don't break dev.
+    exclude: ["canvg", "fflate"],
+  },
 });
