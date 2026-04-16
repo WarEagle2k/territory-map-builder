@@ -4,7 +4,7 @@
     { "name": "Dallas", "state": "TX", "lat": 32.78, "lon": -96.80, "tier": 1 },
     { "name": "San Antonio", "state": "TX", "lat": 29.42, "lon": -98.49, "tier": 1 },
     { "name": "Austin", "state": "TX", "lat": 30.27, "lon": -97.74, "tier": 1 },
-    { "name": "Fort Worth", "state": "TX", "lat": 32.75, "lon": -97.33, "tier": 2 },
+    { "name": "Fort Worth", "state": "TX", "lat": 32.75, "lon": -97.33, "tier": 2, "anchor": "left" },
     { "name": "El Paso", "state": "TX", "lat": 31.76, "lon": -106.49, "tier": 2 },
     { "name": "Corpus Christi", "state": "TX", "lat": 27.80, "lon": -97.40, "tier": 2 },
     { "name": "Lubbock", "state": "TX", "lat": 33.58, "lon": -101.86, "tier": 2 },
@@ -26,7 +26,7 @@
     { "name": "Houma", "state": "LA", "lat": 29.60, "lon": -90.72, "tier": 3 },
 
     { "name": "Jackson", "state": "MS", "lat": 32.30, "lon": -90.18, "tier": 1 },
-    { "name": "Gulfport", "state": "MS", "lat": 30.37, "lon": -89.09, "tier": 2 },
+    { "name": "Gulfport", "state": "MS", "lat": 30.37, "lon": -89.09, "tier": 2, "anchor": "left" },
     { "name": "Biloxi", "state": "MS", "lat": 30.39, "lon": -88.89, "tier": 3 },
     { "name": "Hattiesburg", "state": "MS", "lat": 31.33, "lon": -89.29, "tier": 2 },
     { "name": "Tupelo", "state": "MS", "lat": 34.26, "lon": -88.70, "tier": 3 },
@@ -49,7 +49,7 @@
 
     { "name": "Oklahoma City", "state": "OK", "lat": 35.47, "lon": -97.52, "tier": 1 },
     { "name": "Tulsa", "state": "OK", "lat": 36.15, "lon": -95.99, "tier": 1 },
-    { "name": "Norman", "state": "OK", "lat": 35.22, "lon": -97.44, "tier": 3 },
+    { "name": "Norman", "state": "OK", "lat": 35.22, "lon": -97.44, "tier": 3, "anchor": "left" },
     { "name": "Lawton", "state": "OK", "lat": 34.60, "lon": -98.39, "tier": 3 },
     { "name": "Stillwater", "state": "OK", "lat": 36.12, "lon": -97.06, "tier": 3 },
 
@@ -68,9 +68,9 @@
     { "name": "Pensacola", "state": "FL", "lat": 30.42, "lon": -87.22, "tier": 2 },
     { "name": "Gainesville", "state": "FL", "lat": 29.65, "lon": -82.33, "tier": 3 },
     { "name": "Fort Myers", "state": "FL", "lat": 26.64, "lon": -81.87, "tier": 3 },
-    { "name": "St. Petersburg", "state": "FL", "lat": 27.77, "lon": -82.64, "tier": 3 },
+    { "name": "St. Petersburg", "state": "FL", "lat": 27.77, "lon": -82.64, "tier": 3, "anchor": "left" },
     { "name": "Daytona Beach", "state": "FL", "lat": 29.21, "lon": -81.02, "tier": 3 },
-    { "name": "Fort Lauderdale", "state": "FL", "lat": 26.12, "lon": -80.14, "tier": 3 },
+    { "name": "Fort Lauderdale", "state": "FL", "lat": 26.12, "lon": -80.14, "tier": 3, "anchor": "left" },
     { "name": "West Palm Beach", "state": "FL", "lat": 26.71, "lon": -80.05, "tier": 3 }
   ]
 }

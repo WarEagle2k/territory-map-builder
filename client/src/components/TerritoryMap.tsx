@@ -15,6 +15,8 @@ interface City {
   lat: number;
   lon: number;
   tier: 1 | 2 | 3;
+  /** Override default label side. "right" (default) puts the label east of the dot. */
+  anchor?: "left" | "right";
 }
 
 interface TerritoryMapProps {
@@ -297,11 +299,13 @@ export default function TerritoryMap({
             .attr("fill", "#1f2937")
             .attr("opacity", s.opacity);
 
-          // Label
+          // Label — default anchors to the right of the dot, "left" flips it
+          const leftAnchored = c.anchor === "left";
           group
             .append("text")
-            .attr("x", s.r + 3)
+            .attr("x", leftAnchored ? -(s.r + 3) : s.r + 3)
             .attr("y", 0)
+            .attr("text-anchor", leftAnchored ? "end" : "start")
             .attr("dominant-baseline", "central")
             .attr("font-size", `${s.fs}px`)
             .attr("font-weight", s.fw)
