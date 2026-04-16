@@ -2,9 +2,8 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import TerritoryMap from "@/components/TerritoryMap";
 import TerritoryPanel from "@/components/TerritoryPanel";
 import MapLegend from "@/components/MapLegend";
-import { Map, PanelLeftClose, PanelLeft, Download, Upload, FileDown, Trash2 } from "lucide-react";
+import { PanelLeftClose, PanelLeft, Download, Upload, FileDown, Trash2 } from "lucide-react";
 import { exportTerritoryPDF } from "@/lib/export-pdf";
-import { Button } from "@/components/ui/button";
 import { TERRITORY_COLORS } from "@/lib/territory-colors";
 import {
   loadTerritories,
@@ -27,15 +26,45 @@ interface CountyInfo {
   state: string;
 }
 
-// Derive next ID from an array of territories so imports/restores can't clash
 function nextIdFrom(territories: { id: number }[]): number {
   return territories.length === 0
     ? 1
     : Math.max(...territories.map((t) => t.id)) + 1;
 }
 
+// Compact icon button used only in the branded header (white text on teal bg)
+function HeaderButton({
+  onClick,
+  title,
+  testId,
+  destructive,
+  children,
+}: {
+  onClick: () => void;
+  title: string;
+  testId?: string;
+  destructive?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      data-testid={testId}
+      className={`inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors
+        ${destructive
+          ? "text-white/85 hover:bg-red-500/80 hover:text-white"
+          : "text-white/85 hover:bg-white/15 hover:text-white"}
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand-gold))]`}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function Home() {
-  // Load once on mount from localStorage, fall back to empty / default palette
   const [territories, setTerritories] = useState<ClientTerritory[]>(
     () => loadTerritories() ?? []
   );
@@ -66,14 +95,12 @@ export default function Home() {
     saveColors(colors);
   }, [colors]);
 
-  // Clear import error after a few seconds
   useEffect(() => {
     if (!importError) return;
     const id = setTimeout(() => setImportError(null), 5000);
     return () => clearTimeout(id);
   }, [importError]);
 
-  // Load county names
   useEffect(() => {
     fetch("./county-names.json")
       .then((r) => r.json())
@@ -93,7 +120,6 @@ export default function Home() {
   const handleRemoveColor = useCallback((value: string) => {
     setColors((prev) => {
       const next = prev.filter((c) => c.value !== value);
-      // If the removed color was selected, switch to first remaining
       if (selectedColor === value && next.length > 0) {
         setSelectedColor(next[0].value);
       }
@@ -106,9 +132,7 @@ export default function Home() {
     const set = new Set<string>();
     for (const t of territories) {
       if (t.id === editingTerritoryId) continue;
-      for (const fips of t.countyFips) {
-        set.add(fips);
-      }
+      for (const fips of t.countyFips) set.add(fips);
     }
     return set;
   }, [territories, editingTerritoryId]);
@@ -150,7 +174,6 @@ export default function Home() {
     setSelectedCounties(new Set());
   }, []);
 
-  // --- Territory CRUD ---
   const handleCreateTerritory = useCallback(
     (name: string, color: string, counties: string[]) => {
       setTerritories((prev) => {
@@ -262,8 +285,6 @@ export default function Home() {
             );
             return;
           }
-
-          // Renumber IDs from 1 so imports don't clash with existing
           let counter = 1;
           const imported: ClientTerritory[] = result.data.map((item) => ({
             id: counter++,
@@ -289,71 +310,85 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="h-12 border-b border-border flex items-center px-4 gap-3 flex-shrink-0 bg-card">
-        <Map className="w-5 h-5 text-primary" />
-        <h1 className="text-sm font-semibold" data-testid="app-title">
+      {/* Branded header — gold accent strip over the deep teal bar */}
+      <div
+        className="h-1 flex-shrink-0"
+        style={{ backgroundColor: "hsl(var(--brand-gold))" }}
+      />
+      <header
+        className="h-14 flex items-center px-5 gap-4 flex-shrink-0 text-white shadow-md relative z-10"
+        style={{ backgroundColor: "hsl(var(--brand-teal))" }}
+        data-testid="app-header"
+      >
+        <img
+          src="./csi-logo.png"
+          alt="Connector Specialists Incorporated"
+          className="h-8 w-auto"
+        />
+        <div className="w-px h-6 bg-white/20" aria-hidden />
+        <h1
+          className="text-sm font-medium tracking-wide uppercase"
+          data-testid="app-title"
+        >
           Territory Map Builder
         </h1>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1">
           {hoveredCounty && (
             <div
-              className="text-xs text-muted-foreground hidden sm:block"
+              className="text-xs text-white/80 hidden sm:block mr-3"
               data-testid="hovered-county-info"
             >
-              <span className="font-medium text-foreground">
+              <span className="font-semibold text-white">
                 {hoveredCounty.name}
               </span>
-              , {hoveredCounty.state}
+              <span className="text-white/60">, {hoveredCounty.state}</span>
               {assignedCounties.has(hoveredCounty.fips) && (
-                <span className="ml-1 text-primary">(assigned)</span>
+                <span
+                  className="ml-1.5 font-medium"
+                  style={{ color: "hsl(var(--brand-gold))" }}
+                >
+                  · assigned
+                </span>
               )}
             </div>
           )}
 
           {territories.length > 0 && (
             <>
-              <Button
-                variant="ghost"
-                size="sm"
+              <HeaderButton
                 onClick={handleExportPDF}
-                data-testid="export-pdf-btn"
                 title="Export as PDF"
+                testId="export-pdf-btn"
               >
                 <FileDown className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
+              </HeaderButton>
+              <HeaderButton
                 onClick={handleExport}
-                data-testid="export-btn"
                 title="Export as JSON"
+                testId="export-btn"
               >
                 <Download className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
+              </HeaderButton>
+              <HeaderButton
                 onClick={handleClearAllTerritories}
-                data-testid="clear-all-btn"
                 title="Clear all territories"
-                className="text-destructive hover:text-destructive"
+                testId="clear-all-btn"
+                destructive
               >
                 <Trash2 className="w-4 h-4" />
-              </Button>
+              </HeaderButton>
+              <div className="w-px h-5 bg-white/20 mx-1" aria-hidden />
             </>
           )}
 
-          <Button
-            variant="ghost"
-            size="sm"
+          <HeaderButton
             onClick={() => fileInputRef.current?.click()}
-            data-testid="import-btn"
             title="Import territories"
+            testId="import-btn"
           >
             <Upload className="w-4 h-4" />
-          </Button>
+          </HeaderButton>
           <input
             ref={fileInputRef}
             type="file"
@@ -362,18 +397,17 @@ export default function Home() {
             onChange={handleImport}
           />
 
-          <Button
-            variant="ghost"
-            size="sm"
+          <HeaderButton
             onClick={() => setPanelOpen(!panelOpen)}
-            data-testid="toggle-panel-btn"
+            title={panelOpen ? "Hide panel" : "Show panel"}
+            testId="toggle-panel-btn"
           >
             {panelOpen ? (
               <PanelLeftClose className="w-4 h-4" />
             ) : (
               <PanelLeft className="w-4 h-4" />
             )}
-          </Button>
+          </HeaderButton>
         </div>
       </header>
 
@@ -408,7 +442,7 @@ export default function Home() {
         </div>
 
         {panelOpen && (
-          <div className="w-80 border-l border-border bg-card flex-shrink-0 overflow-hidden">
+          <aside className="w-80 border-l border-border bg-sidebar flex-shrink-0 overflow-hidden">
             <TerritoryPanel
               territories={territories}
               selectedCounties={selectedCounties}
@@ -428,7 +462,7 @@ export default function Home() {
               editingTerritoryId={editingTerritoryId}
               countyNames={countyNames}
             />
-          </div>
+          </aside>
         )}
       </div>
     </div>

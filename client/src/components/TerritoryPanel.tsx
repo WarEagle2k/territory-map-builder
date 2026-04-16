@@ -115,9 +115,9 @@ export default function TerritoryPanel({
       <div className="p-4 border-b border-border">
         {isEditingCounties && editingTerritory ? (
           <>
-            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Pencil className="w-4 h-4" />
-              Editing: {editingTerritory.name}
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-primary mb-3 flex items-center gap-1.5">
+              <Pencil className="w-3.5 h-3.5" />
+              Editing · {editingTerritory.name}
             </h2>
             <p className="text-xs text-muted-foreground mb-3">
               Click counties to remove them. Drag to add new ones.
@@ -151,8 +151,8 @@ export default function TerritoryPanel({
           </>
         ) : (
           <>
-            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Plus className="w-4 h-4" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Plus className="w-3.5 h-3.5" />
               Create Territory
             </h2>
 
@@ -305,15 +305,22 @@ export default function TerritoryPanel({
 
       {/* Territory List */}
       <div className="flex-1 overflow-y-auto p-4">
-        <h2 className="text-sm font-semibold mb-3">
-          Territories ({territories.length})
-        </h2>
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Territories
+          </h2>
+          <span className="text-xs font-semibold text-muted-foreground tabular-nums">
+            {territories.length}
+          </span>
+        </div>
 
         {territories.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            Click counties on the map, name your territory, pick a color, and
-            save.
-          </p>
+          <div className="rounded-md border border-dashed border-border p-4 text-center">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Click or drag counties on the map, name your territory, pick a
+              color, and save.
+            </p>
+          </div>
         )}
 
         <div className="space-y-2">
@@ -324,18 +331,24 @@ export default function TerritoryPanel({
             return (
               <Card
                 key={t.id}
-                className={`p-3 transition-colors ${
+                className={`relative overflow-hidden p-3 pl-4 transition-all cursor-default ${
                   isBeingEdited
-                    ? "ring-2 ring-primary bg-accent/50"
-                    : "hover:bg-accent/50"
+                    ? "ring-2 ring-primary shadow-md"
+                    : "hover:shadow-sm hover:-translate-y-px"
                 }`}
                 onMouseEnter={() => onHighlightTerritory(t.id)}
                 onMouseLeave={() => onHighlightTerritory(null)}
                 data-testid={`territory-card-${t.id}`}
               >
+                {/* Colored left accent bar — 3px wide */}
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-[3px]"
+                  style={{ backgroundColor: t.color }}
+                  aria-hidden
+                />
                 <div className="flex items-center gap-2">
                   <div
-                    className="w-4 h-4 rounded-sm flex-shrink-0"
+                    className="w-3 h-3 rounded-full flex-shrink-0 ring-1 ring-black/10"
                     style={{ backgroundColor: t.color }}
                   />
 

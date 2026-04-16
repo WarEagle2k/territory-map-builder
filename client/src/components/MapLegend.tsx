@@ -10,35 +10,41 @@ export default function MapLegend({ territories, onHighlight }: MapLegendProps) 
 
   return (
     <div
-      className="absolute bottom-4 left-4 bg-background/90 backdrop-blur-sm border border-border rounded-lg p-3 shadow-md max-w-xs"
+      className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm border border-border rounded-lg shadow-md overflow-hidden max-w-xs"
       data-testid="map-legend"
     >
-      <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+      {/* Branded header strip */}
+      <div
+        className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white"
+        style={{ backgroundColor: "hsl(var(--brand-teal))" }}
+      >
         Territories
-      </h3>
-      <div className="space-y-1.5">
+      </div>
+
+      <div className="p-3 space-y-1.5">
         {territories.map((t) => (
           <div
             key={t.id}
-            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+            className="flex items-center gap-2 cursor-default rounded px-1 py-0.5 -mx-1 hover:bg-accent/50 transition-colors"
             onMouseEnter={() => onHighlight(t.id)}
             onMouseLeave={() => onHighlight(null)}
             data-testid={`legend-item-${t.id}`}
           >
             <div
-              className="w-3 h-3 rounded-sm flex-shrink-0"
+              className="w-3 h-3 rounded-sm flex-shrink-0 ring-1 ring-black/10"
               style={{ backgroundColor: t.color }}
             />
-            <span className="text-xs font-medium truncate">{t.name}</span>
-            <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">
+            <span className="text-xs font-medium truncate flex-1">{t.name}</span>
+            <span className="text-[10px] text-muted-foreground tabular-nums flex-shrink-0">
               {t.countyFips.length}
             </span>
           </div>
         ))}
-      </div>
-      <div className="mt-2 pt-2 border-t border-border flex items-center gap-2">
-        <div className="w-3 h-3 rounded-sm bg-slate-200 dark:bg-slate-700 flex-shrink-0" />
-        <span className="text-xs text-muted-foreground">Unassigned</span>
+
+        <div className="mt-2 pt-2 border-t border-border flex items-center gap-2 px-1">
+          <div className="w-3 h-3 rounded-sm bg-slate-200 flex-shrink-0 ring-1 ring-black/5" />
+          <span className="text-[11px] text-muted-foreground">Unassigned</span>
+        </div>
       </div>
     </div>
   );
