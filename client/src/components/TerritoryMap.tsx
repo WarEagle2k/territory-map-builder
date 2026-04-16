@@ -17,6 +17,8 @@ interface City {
   tier: 1 | 2 | 3;
   /** Override default label side. "right" (default) puts the label east of the dot. */
   anchor?: "left" | "right";
+  /** Optional vertical nudge in px (negative = move label above the dot). */
+  dy?: number;
 }
 
 interface TerritoryMapProps {
@@ -299,13 +301,22 @@ export default function TerritoryMap({
             .attr("fill", "#1f2937")
             .attr("opacity", s.opacity);
 
-          // Label — default anchors to the right of the dot, "left" flips it
+          // Label rules:
+          //   - anchor "left"/"right" controls horizontal placement relative to dot
+          //   - dy nudges the label up/down to clear borders or coastlines
+          //   - if ONLY dy is set (no anchor), center horizontally over the dot
+          const horizontal = c.anchor != null;
           const leftAnchored = c.anchor === "left";
+          const dy = c.dy ?? 0;
+          const centered = dy !== 0 && !horizontal;
           group
             .append("text")
-            .attr("x", leftAnchored ? -(s.r + 3) : s.r + 3)
-            .attr("y", 0)
-            .attr("text-anchor", leftAnchored ? "end" : "start")
+            .attr("x", centered ? 0 : leftAnchored ? -(s.r + 3) : s.r + 3)
+            .attr("y", dy)
+            .attr(
+              "text-anchor",
+              centered ? "middle" : leftAnchored ? "end" : "start"
+            )
             .attr("dominant-baseline", "central")
             .attr("font-size", `${s.fs}px`)
             .attr("font-weight", s.fw)
