@@ -94,8 +94,12 @@ export default function TerritoryPanel({
     setTerritoryName("");
   };
 
-  // Colors already used
-  const usedColors = new Set(territories.map((t) => t.color));
+  // Colors already used — but allow the color of the territory currently being edited
+  const usedColors = new Set(
+    territories
+      .filter((t) => t.id !== editingTerritoryId)
+      .map((t) => t.color)
+  );
 
   const getCountyLabel = (fips: string) => {
     const info = countyNames[fips];
@@ -176,19 +180,31 @@ export default function TerritoryPanel({
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {colors.map((c) => (
-                    <div key={c.value} className="relative group">
+                  {colors.map((c) => {
+                    const isUsed = usedColors.has(c.value);
+                    return (
+                    <div key={c.value} className="relative group w-6 h-6 flex items-center justify-center">
                       <button
                         className={`w-6 h-6 rounded-full border-2 transition-transform ${
                           selectedColor === c.value
                             ? "border-foreground scale-110"
                             : "border-transparent hover:scale-105"
-                        } ${usedColors.has(c.value) ? "opacity-30" : ""}`}
+                        } ${isUsed ? "opacity-50 cursor-not-allowed" : ""}`}
                         style={{ backgroundColor: c.value }}
-                        onClick={() => onColorChange(c.value)}
-                        title={c.name}
+                        onClick={() => {
+                          if (isUsed) return;
+                          onColorChange(c.value);
+                        }}
+                        disabled={isUsed}
+                        title={isUsed ? `${c.name} (already used)` : c.name}
                         data-testid={`color-${c.name.toLowerCase()}`}
                       />
+                      {isUsed && (
+                        <span
+                          aria-hidden
+                          className="pointer-events-none absolute top-1/2 left-1/2 w-[22px] h-[2px] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-foreground rounded-full shadow-[0_0_0_1px_rgba(255,255,255,0.8)]"
+                        />
+                      )}
                       {showColorManager && !usedColors.has(c.value) && (
                         <button
                           className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-destructive text-destructive-foreground rounded-full text-[8px] leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -202,7 +218,8 @@ export default function TerritoryPanel({
                         </button>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 {showColorManager && (
                   <div className="mt-2 space-y-2">

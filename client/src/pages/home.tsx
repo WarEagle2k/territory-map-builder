@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import TerritoryMap from "@/components/TerritoryMap";
 import TerritoryPanel from "@/components/TerritoryPanel";
 import MapLegend from "@/components/MapLegend";
-import { Map, PanelLeftClose, PanelLeft, Download, Upload, FileDown } from "lucide-react";
+import { Map, PanelLeftClose, PanelLeft, Download, Upload, FileDown, Trash2 } from "lucide-react";
 import { exportTerritoryPDF } from "@/lib/export-pdf";
 import { Button } from "@/components/ui/button";
 import { TERRITORY_COLORS } from "@/lib/territory-colors";
@@ -205,6 +205,18 @@ export default function Home() {
     setSelectedCounties(new Set());
   }, []);
 
+  const handleClearAllTerritories = useCallback(() => {
+    if (territories.length === 0) return;
+    const confirmed = window.confirm(
+      `Delete all ${territories.length} territor${territories.length === 1 ? "y" : "ies"}? This cannot be undone.`
+    );
+    if (!confirmed) return;
+    setTerritories([]);
+    setEditingTerritoryId(null);
+    setSelectedCounties(new Set());
+    nextIdRef.current = 1;
+  }, [territories.length]);
+
   // --- Export / Import ---
   const handleExportPDF = useCallback(() => {
     const svgEl = document.querySelector(
@@ -319,6 +331,16 @@ export default function Home() {
                 title="Export as JSON"
               >
                 <Download className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearAllTerritories}
+                data-testid="clear-all-btn"
+                title="Clear all territories"
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="w-4 h-4" />
               </Button>
             </>
           )}
