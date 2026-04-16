@@ -300,8 +300,8 @@ export default function TerritoryMap({
             .attr("fill", "#1f2937")
             .attr("opacity", s.opacity);
 
-          // Label — white stroke under black fill for legibility over any color
-          const label = group
+          // Label
+          group
             .append("text")
             .attr("x", s.r + 3)
             .attr("y", 0)
@@ -311,22 +311,6 @@ export default function TerritoryMap({
             .attr("fill", "#111827")
             .attr("opacity", s.opacity)
             .text(c.name);
-          // White halo behind text for legibility — draw a stroked copy first
-          const haloText = group
-            .insert("text", "text") // insert BEFORE the label
-            .attr("x", s.r + 3)
-            .attr("y", 0)
-            .attr("dominant-baseline", "central")
-            .attr("font-size", `${s.fs}px`)
-            .attr("font-weight", s.fw)
-            .attr("stroke", "#ffffff")
-            .attr("stroke-width", 3)
-            .attr("stroke-linejoin", "round")
-            .attr("fill", "none")
-            .attr("opacity", 0.85)
-            .text(c.name);
-          void label;
-          void haloText;
         });
     }
 
