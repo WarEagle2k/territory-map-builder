@@ -9,6 +9,14 @@ interface CountyInfo {
   state: string;
 }
 
+interface City {
+  name: string;
+  state: string;
+  lat: number;
+  lon: number;
+  tier: 1 | 2 | 3;
+}
+
 interface TerritoryMapProps {
   territories: ClientTerritory[];
   selectedCounties: Set<string>;
@@ -49,6 +57,7 @@ export default function TerritoryMap({
   const pathRef = useRef<d3.GeoPath | null>(null);
   const [topoData, setTopoData] = useState<Topology | null>(null);
   const [highwayData, setHighwayData] = useState<Topology | null>(null);
+  const [cities, setCities] = useState<City[]>([]);
   const [countyNames, setCountyNames] = useState<Record<string, CountyInfo>>({});
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [geometryReady, setGeometryReady] = useState(false);
@@ -74,11 +83,13 @@ export default function TerritoryMap({
       fetch("./region-topo.json").then((r) => r.json()),
       fetch("./county-names.json").then((r) => r.json()),
       fetch("./highways-topo.json").then((r) => r.json()),
+      fetch("./cities.json").then((r) => r.json()),
     ])
-      .then(([topo, names, highways]) => {
+      .then(([topo, names, highways, citiesData]) => {
         setTopoData(topo);
         setCountyNames(names);
         setHighwayData(highways);
+        setCities(citiesData?.cities ?? []);
       })
       .catch(() => {});
   }, []);
@@ -253,6 +264,72 @@ export default function TerritoryMap({
       .attr("stroke-width", 1.5)
       .style("pointer-events", "none");
 
+    // City markers (dots) + labels. Inserted above county/highway/state-border
+    // so they're readable, but below the big state labels.
+    if (cities.length > 0) {
+      const cityGroup = g.append("g").attr("class", "cities-layer");
+
+      const tierStyle = (t: 1 | 2 | 3) => {
+        if (t === 1) return { r: 2.2, fs: 10, fw: 700, opacity: 0.9 };
+        if (t === 2) return { r: 1.6, fs: 9, fw: 600, opacity: 0.75 };
+        return { r: 1.2, fs: 8, fw: 500, opacity: 0.6 };
+      };
+
+      cityGroup
+        .selectAll("g.city")
+        .data(cities)
+        .join("g")
+        .attr("class", "city")
+        .style("pointer-events", "none")
+        .each(function (c) {
+          const point = projection([c.lon, c.lat]);
+          if (!point) return;
+          const [x, y] = point;
+          const s = tierStyle(c.tier);
+          const group = d3.select(this).attr("transform", `translate(${x}, ${y})`);
+
+          // Dot (white halo + dark center)
+          group
+            .append("circle")
+            .attr("r", s.r + 0.8)
+            .attr("fill", "#ffffff")
+            .attr("opacity", 0.9);
+          group
+            .append("circle")
+            .attr("r", s.r)
+            .attr("fill", "#1f2937")
+            .attr("opacity", s.opacity);
+
+          // Label — white stroke under black fill for legibility over any color
+          const label = group
+            .append("text")
+            .attr("x", s.r + 3)
+            .attr("y", 0)
+            .attr("dominant-baseline", "central")
+            .attr("font-size", `${s.fs}px`)
+            .attr("font-weight", s.fw)
+            .attr("fill", "#111827")
+            .attr("opacity", s.opacity)
+            .text(c.name);
+          // White halo behind text for legibility — draw a stroked copy first
+          const haloText = group
+            .insert("text", "text") // insert BEFORE the label
+            .attr("x", s.r + 3)
+            .attr("y", 0)
+            .attr("dominant-baseline", "central")
+            .attr("font-size", `${s.fs}px`)
+            .attr("font-weight", s.fw)
+            .attr("stroke", "#ffffff")
+            .attr("stroke-width", 3)
+            .attr("stroke-linejoin", "round")
+            .attr("fill", "none")
+            .attr("opacity", 0.85)
+            .text(c.name);
+          void label;
+          void haloText;
+        });
+    }
+
     // State labels
     g.selectAll("text.state-label")
       .data(states.features)
@@ -275,7 +352,7 @@ export default function TerritoryMap({
       document.removeEventListener("mouseup", handleMouseUp);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topoData, highwayData]); // NOTE: dimensions intentionally excluded — resize handled below
+  }, [topoData, highwayData, cities]); // NOTE: dimensions intentionally excluded — resize handled below
 
   // --- RESIZE — re-project and update path `d` without rebuilding DOM ---
   useEffect(() => {
@@ -305,6 +382,15 @@ export default function TerritoryMap({
     g.selectAll<SVGTextElement, GeoJSON.Feature>("text.state-label")
       .attr("x", (d) => path.centroid(d)[0])
       .attr("y", (d) => path.centroid(d)[1]);
+
+    // Re-project city markers
+    g.selectAll<SVGGElement, City>("g.cities-layer > g.city").attr(
+      "transform",
+      (c) => {
+        const pt = projection([c.lon, c.lat]);
+        return pt ? `translate(${pt[0]}, ${pt[1]})` : "";
+      }
+    );
   }, [dimensions, geometryReady, topoData]);
 
   // --- STYLE UPDATE — fill/stroke on selection / territory / highlight changes ---
