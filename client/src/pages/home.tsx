@@ -33,6 +33,7 @@ function nextIdFrom(territories: { id: number }[]): number {
 }
 
 // Compact icon button used only in the branded header (white text on teal bg)
+// Shows a styled tooltip on hover/focus.
 function HeaderButton({
   onClick,
   title,
@@ -47,20 +48,39 @@ function HeaderButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-label={title}
-      data-testid={testId}
-      className={`inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors
-        ${destructive
-          ? "text-white/85 hover:bg-red-500/80 hover:text-white"
-          : "text-white/85 hover:bg-white/15 hover:text-white"}
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand-gold))]`}
-    >
-      {children}
-    </button>
+    <div className="relative group">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={title}
+        data-testid={testId}
+        className={`inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors
+          ${destructive
+            ? "text-white/85 hover:bg-red-500/80 hover:text-white"
+            : "text-white/85 hover:bg-white/15 hover:text-white"}
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand-gold))]`}
+      >
+        {children}
+      </button>
+      {/* Tooltip */}
+      <div
+        role="tooltip"
+        className="pointer-events-none absolute top-full right-0 mt-2 z-50
+                   whitespace-nowrap rounded-md bg-slate-900 px-2 py-1
+                   text-[11px] font-medium text-white shadow-lg
+                   opacity-0 scale-95 translate-y-0.5
+                   transition-all duration-150
+                   group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0
+                   group-focus-within:opacity-100 group-focus-within:scale-100 group-focus-within:translate-y-0"
+      >
+        {title}
+        {/* Little arrow pointing up at the button */}
+        <span
+          aria-hidden
+          className="absolute -top-1 right-3 w-2 h-2 rotate-45 bg-slate-900"
+        />
+      </div>
+    </div>
   );
 }
 
