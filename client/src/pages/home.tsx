@@ -21,6 +21,7 @@ export interface ClientTerritory {
   color: string;
   countyFips: string[];
   title?: string;
+  branch?: string;
   phone?: string;
   email?: string;
 }
@@ -216,7 +217,7 @@ export default function Home() {
     (
       id: number,
       updates: Partial<
-        Pick<ClientTerritory, "name" | "color" | "title" | "phone" | "email">
+        Pick<ClientTerritory, "name" | "color" | "title" | "branch" | "phone" | "email">
       >
     ) => {
       setTerritories((prev) =>
@@ -286,6 +287,7 @@ export default function Home() {
       name: t.name,
       color: t.color,
       title: t.title,
+      branch: t.branch,
       phone: t.phone,
       email: t.email,
       counties: t.countyFips.map((fips) => ({
@@ -329,6 +331,7 @@ export default function Home() {
               typeof c === "string" ? c : c.fips
             ),
             title: item.title,
+            branch: item.branch,
             phone: item.phone,
             email: item.email,
           }));
