@@ -19,6 +19,9 @@ export interface ClientTerritory {
   name: string;
   color: string;
   countyFips: string[];
+  title?: string;
+  phone?: string;
+  email?: string;
 }
 
 interface CountyInfo {
@@ -208,7 +211,12 @@ export default function Home() {
   );
 
   const handleUpdateTerritory = useCallback(
-    (id: number, updates: Partial<Pick<ClientTerritory, "name" | "color">>) => {
+    (
+      id: number,
+      updates: Partial<
+        Pick<ClientTerritory, "name" | "color" | "title" | "phone" | "email">
+      >
+    ) => {
       setTerritories((prev) =>
         prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
       );
@@ -275,6 +283,9 @@ export default function Home() {
     const data = territories.map((t) => ({
       name: t.name,
       color: t.color,
+      title: t.title,
+      phone: t.phone,
+      email: t.email,
       counties: t.countyFips.map((fips) => ({
         fips,
         name: countyNames[fips]?.name || fips,
@@ -315,6 +326,9 @@ export default function Home() {
             countyFips: item.counties.map((c) =>
               typeof c === "string" ? c : c.fips
             ),
+            title: item.title,
+            phone: item.phone,
+            email: item.email,
           }));
           setTerritories(imported);
           nextIdRef.current = nextIdFrom(imported);

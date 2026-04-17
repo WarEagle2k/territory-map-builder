@@ -9,6 +9,9 @@ const territorySchema = z.object({
   name: z.string().min(1),
   color: z.string().regex(hexColorRegex),
   countyFips: z.array(z.string()),
+  title: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().optional(),
 });
 
 export const territoriesSchema = z.array(territorySchema);
@@ -31,6 +34,9 @@ export const importFileSchema = z.array(
         z.object({ fips: z.string() }).passthrough(),
       ])
     ),
+    title: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().optional(),
   })
 );
 
