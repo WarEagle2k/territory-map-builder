@@ -6,8 +6,14 @@ interface CountyInfo {
   state: string;
 }
 
-// Convert SVG element to a PNG data URL via canvas, cropped to the map content
-async function svgToImage(svgEl: SVGSVGElement): Promise<{ dataUrl: string; width: number; height: number }> {
+// Convert SVG element to a PNG data URL via canvas, cropped to the map content.
+// If `focusFips` is provided, the crop focuses on those counties (+ context
+// padding) so assigned territories fill more of the frame instead of being
+// swamped by whitespace in unassigned states.
+async function svgToImage(
+  svgEl: SVGSVGElement,
+  focusFips?: Set<string>
+): Promise<{ dataUrl: string; width: number; height: number }> {
   // Clone the SVG so we can modify it without affecting the live DOM
   const clone = svgEl.cloneNode(true) as SVGSVGElement;
 
@@ -27,20 +33,48 @@ async function svgToImage(svgEl: SVGSVGElement): Promise<{ dataUrl: string; widt
     const origTransform = liveG.getAttribute("transform") || "";
     liveG.setAttribute("transform", "");
 
-    // Only measure county and state paths (not highways, which extend beyond visible area)
-    const mapPaths = liveG.querySelectorAll("path.county, path.state");
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    mapPaths.forEach((el) => {
+    // Full bounds — always compute so we can clamp the zoomed crop to it
+    const allPaths = liveG.querySelectorAll("path.county, path.state");
+    let fullMinX = Infinity, fullMinY = Infinity;
+    let fullMaxX = -Infinity, fullMaxY = -Infinity;
+    allPaths.forEach((el) => {
       const b = (el as SVGPathElement).getBBox();
-      minX = Math.min(minX, b.x);
-      minY = Math.min(minY, b.y);
-      maxX = Math.max(maxX, b.x + b.width);
-      maxY = Math.max(maxY, b.y + b.height);
+      fullMinX = Math.min(fullMinX, b.x);
+      fullMinY = Math.min(fullMinY, b.y);
+      fullMaxX = Math.max(fullMaxX, b.x + b.width);
+      fullMaxY = Math.max(fullMaxY, b.y + b.height);
     });
+
+    // Focused bounds — only the assigned counties, if provided
+    let minX = fullMinX, minY = fullMinY;
+    let maxX = fullMaxX, maxY = fullMaxY;
+    if (focusFips && focusFips.size > 0) {
+      let fMinX = Infinity, fMinY = Infinity;
+      let fMaxX = -Infinity, fMaxY = -Infinity;
+      let found = false;
+      liveG.querySelectorAll<SVGPathElement>("path.county").forEach((el) => {
+        const fips = el.getAttribute("data-fips");
+        if (!fips || !focusFips.has(fips)) return;
+        const b = el.getBBox();
+        fMinX = Math.min(fMinX, b.x);
+        fMinY = Math.min(fMinY, b.y);
+        fMaxX = Math.max(fMaxX, b.x + b.width);
+        fMaxY = Math.max(fMaxY, b.y + b.height);
+        found = true;
+      });
+      if (found) {
+        // Add ~20% padding of the focus region's larger dimension on each side
+        // so the territories aren't flush against the edge — gives context.
+        const pad = Math.max(fMaxX - fMinX, fMaxY - fMinY) * 0.2;
+        minX = Math.max(fullMinX, fMinX - pad);
+        minY = Math.max(fullMinY, fMinY - pad);
+        maxX = Math.min(fullMaxX, fMaxX + pad);
+        maxY = Math.min(fullMaxY, fMaxY + pad);
+      }
+    }
 
     liveG.setAttribute("transform", origTransform);
 
-    // Add a small padding around the content
     const pad = 10;
     bbox = {
       x: minX - pad,
@@ -216,8 +250,15 @@ export async function exportTerritoryPDF(
 
   let mapBottomY = mapTop + mapAreaHeight;
 
+  // Collect all assigned FIPS so the map crops to focus on the territory area
+  const assignedFips = new Set<string>();
+  for (const t of territories) {
+    for (const f of t.countyFips) assignedFips.add(f);
+  }
+
   try {
-    const { dataUrl: mapImage, width: cropW, height: cropH } = await svgToImage(svgEl);
+    const { dataUrl: mapImage, width: cropW, height: cropH } =
+      await svgToImage(svgEl, assignedFips);
     const mapAspect = cropW / cropH;
     let drawW = mapAreaWidth;
     let drawH = drawW / mapAspect;
