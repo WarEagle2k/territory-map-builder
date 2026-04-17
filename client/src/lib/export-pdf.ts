@@ -298,12 +298,17 @@ export async function exportTerritoryPDF(
     const imgY = mapCenterY - (focusCenterY - fullBbox.y) * scale;
 
     // Clip to the map rectangle so the overflow of the full region gets cut
-    // at the map area's edges instead of bleeding into header/key/footer.
+    // at the map area's edges. jsPDF's rect() also strokes a visible outline
+    // by default — use the context2d API instead, which creates a path
+    // without painting it.
     pdf.saveGraphicsState();
-    pdf.rect(mapAreaX, mapAreaY, mapAreaWidth, mapAreaHeight);
-    pdf.clip();
-    pdf.discardPath();
+    const ctx = pdf.context2d;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(mapAreaX, mapAreaY, mapAreaWidth, mapAreaHeight);
+    ctx.clip();
     pdf.addImage(mapImage, "PNG", imgX, imgY, imgW, imgH);
+    ctx.restore();
     pdf.restoreGraphicsState();
 
     mapBottomY = mapAreaY + mapAreaHeight;
