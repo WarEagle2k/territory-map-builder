@@ -3,9 +3,15 @@ import type { ClientTerritory } from "@/pages/home";
 interface MapLegendProps {
   territories: ClientTerritory[];
   onHighlight: (id: number | null) => void;
+  /** Matches the territory fill opacity on the map for visual consistency */
+  swatchOpacity?: number;
 }
 
-export default function MapLegend({ territories, onHighlight }: MapLegendProps) {
+export default function MapLegend({
+  territories,
+  onHighlight,
+  swatchOpacity = 1,
+}: MapLegendProps) {
   if (territories.length === 0) return null;
 
   return (
@@ -32,7 +38,7 @@ export default function MapLegend({ territories, onHighlight }: MapLegendProps) 
           >
             <div
               className="w-3 h-3 rounded-sm flex-shrink-0 ring-1 ring-black/10"
-              style={{ backgroundColor: t.color }}
+              style={{ backgroundColor: t.color, opacity: swatchOpacity }}
             />
             <span className="text-xs font-medium truncate flex-1">{t.name}</span>
             <span className="text-[10px] text-muted-foreground tabular-nums flex-shrink-0">

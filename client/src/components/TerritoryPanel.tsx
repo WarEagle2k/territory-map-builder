@@ -41,6 +41,8 @@ interface TerritoryPanelProps {
   onCancelEditCounties: () => void;
   editingTerritoryId: number | null;
   countyNames: Record<string, { name: string; state: string }>;
+  /** Match on-map territory opacity for visual consistency */
+  swatchOpacity?: number;
 }
 
 export default function TerritoryPanel({
@@ -61,6 +63,7 @@ export default function TerritoryPanel({
   onCancelEditCounties,
   editingTerritoryId,
   countyNames,
+  swatchOpacity = 1,
 }: TerritoryPanelProps) {
   const [territoryName, setTerritoryName] = useState("");
   const [editingNameId, setEditingNameId] = useState<number | null>(null);
@@ -355,13 +358,13 @@ export default function TerritoryPanel({
                 {/* Colored left accent bar — 3px wide */}
                 <div
                   className="absolute left-0 top-0 bottom-0 w-[3px]"
-                  style={{ backgroundColor: t.color }}
+                  style={{ backgroundColor: t.color, opacity: swatchOpacity }}
                   aria-hidden
                 />
                 <div className="flex items-center gap-2">
                   <div
                     className="w-3 h-3 rounded-full flex-shrink-0 ring-1 ring-black/10"
-                    style={{ backgroundColor: t.color }}
+                    style={{ backgroundColor: t.color, opacity: swatchOpacity }}
                   />
 
                   {editingNameId === t.id ? (

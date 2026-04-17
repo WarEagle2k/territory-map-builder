@@ -483,6 +483,7 @@ export default function Home() {
           <MapLegend
             territories={territories}
             onHighlight={setHighlightTerritoryId}
+            swatchOpacity={territoryOpacity}
           />
         </div>
 
@@ -506,6 +507,7 @@ export default function Home() {
               onCancelEditCounties={handleCancelEditCounties}
               editingTerritoryId={editingTerritoryId}
               countyNames={countyNames}
+              swatchOpacity={territoryOpacity}
             />
           </aside>
         )}
