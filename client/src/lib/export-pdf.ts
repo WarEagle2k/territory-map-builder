@@ -6,86 +6,90 @@ interface CountyInfo {
   state: string;
 }
 
-// Convert SVG element to a PNG data URL via canvas, cropped to the map content.
-// If `focusFips` is provided, the crop focuses on those counties (+ context
-// padding) so assigned territories fill more of the frame instead of being
-// swamped by whitespace in unassigned states.
+// Rect in SVG coordinates
+interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// Convert SVG element to a PNG data URL via canvas.
+// Renders the full region; returns both the full bounding box used for the
+// image and (optionally) a tighter focus bounding box the caller can use to
+// zoom/position the image on a destination canvas (like a PDF page).
 async function svgToImage(
   svgEl: SVGSVGElement,
   focusFips?: Set<string>
-): Promise<{ dataUrl: string; width: number; height: number }> {
-  // Clone the SVG so we can modify it without affecting the live DOM
+): Promise<{ dataUrl: string; fullBbox: Rect; focusBbox: Rect | null }> {
   const clone = svgEl.cloneNode(true) as SVGSVGElement;
-
-  // Reset the D3 zoom transform on the clone
   const gEl = clone.querySelector("g");
-  if (gEl) {
-    gEl.setAttribute("transform", "");
-  }
+  if (gEl) gEl.setAttribute("transform", "");
 
-  // Get the bounding box of all the path elements (the actual map content)
-  // We need to do this on the live SVG before zoom is applied
   const liveG = svgEl.querySelector("g");
-  let bbox: { x: number; y: number; width: number; height: number };
+  let fullBbox: Rect;
+  let focusBbox: Rect | null = null;
 
   if (liveG) {
-    // Temporarily reset zoom to get the un-zoomed bounding box
     const origTransform = liveG.getAttribute("transform") || "";
     liveG.setAttribute("transform", "");
 
-    // Full bounds — always compute so we can clamp the zoomed crop to it
+    // Full bounds
     const allPaths = liveG.querySelectorAll("path.county, path.state");
-    let fullMinX = Infinity, fullMinY = Infinity;
-    let fullMaxX = -Infinity, fullMaxY = -Infinity;
+    let fMinX = Infinity, fMinY = Infinity, fMaxX = -Infinity, fMaxY = -Infinity;
     allPaths.forEach((el) => {
       const b = (el as SVGPathElement).getBBox();
-      fullMinX = Math.min(fullMinX, b.x);
-      fullMinY = Math.min(fullMinY, b.y);
-      fullMaxX = Math.max(fullMaxX, b.x + b.width);
-      fullMaxY = Math.max(fullMaxY, b.y + b.height);
+      fMinX = Math.min(fMinX, b.x);
+      fMinY = Math.min(fMinY, b.y);
+      fMaxX = Math.max(fMaxX, b.x + b.width);
+      fMaxY = Math.max(fMaxY, b.y + b.height);
     });
+    const pad = 10;
+    fullBbox = {
+      x: fMinX - pad,
+      y: fMinY - pad,
+      width: fMaxX - fMinX + pad * 2,
+      height: fMaxY - fMinY + pad * 2,
+    };
 
-    // Focused bounds — only the assigned counties, if provided
-    let minX = fullMinX, minY = fullMinY;
-    let maxX = fullMaxX, maxY = fullMaxY;
+    // Focus bounds — only the assigned counties
     if (focusFips && focusFips.size > 0) {
-      let fMinX = Infinity, fMinY = Infinity;
-      let fMaxX = -Infinity, fMaxY = -Infinity;
+      let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
       let found = false;
       liveG.querySelectorAll<SVGPathElement>("path.county").forEach((el) => {
         const fips = el.getAttribute("data-fips");
         if (!fips || !focusFips.has(fips)) return;
         const b = el.getBBox();
-        fMinX = Math.min(fMinX, b.x);
-        fMinY = Math.min(fMinY, b.y);
-        fMaxX = Math.max(fMaxX, b.x + b.width);
-        fMaxY = Math.max(fMaxY, b.y + b.height);
+        bMinX = Math.min(bMinX, b.x);
+        bMinY = Math.min(bMinY, b.y);
+        bMaxX = Math.max(bMaxX, b.x + b.width);
+        bMaxY = Math.max(bMaxY, b.y + b.height);
         found = true;
       });
       if (found) {
-        // Add ~20% padding of the focus region's larger dimension on each side
-        // so the territories aren't flush against the edge — gives context.
-        const pad = Math.max(fMaxX - fMinX, fMaxY - fMinY) * 0.2;
-        minX = Math.max(fullMinX, fMinX - pad);
-        minY = Math.max(fullMinY, fMinY - pad);
-        maxX = Math.min(fullMaxX, fMaxX + pad);
-        maxY = Math.min(fullMaxY, fMaxY + pad);
+        // ~15% padding around the focus area for breathing room
+        const fpad = Math.max(bMaxX - bMinX, bMaxY - bMinY) * 0.15;
+        focusBbox = {
+          x: bMinX - fpad,
+          y: bMinY - fpad,
+          width: bMaxX - bMinX + fpad * 2,
+          height: bMaxY - bMinY + fpad * 2,
+        };
       }
     }
 
     liveG.setAttribute("transform", origTransform);
-
-    const pad = 10;
-    bbox = {
-      x: minX - pad,
-      y: minY - pad,
-      width: (maxX - minX) + pad * 2,
-      height: (maxY - minY) + pad * 2,
-    };
   } else {
     const viewBox = svgEl.viewBox.baseVal;
-    bbox = { x: 0, y: 0, width: viewBox.width || svgEl.clientWidth, height: viewBox.height || svgEl.clientHeight };
+    fullBbox = {
+      x: 0,
+      y: 0,
+      width: viewBox.width || svgEl.clientWidth,
+      height: viewBox.height || svgEl.clientHeight,
+    };
   }
+
+  const bbox = fullBbox;
 
   // Set the viewBox to the tight bounding box so we only capture the map content
   clone.setAttribute("viewBox", `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`);
@@ -111,7 +115,11 @@ async function svgToImage(
       ctx.scale(scale, scale);
       ctx.drawImage(img, 0, 0, bbox.width, bbox.height);
       URL.revokeObjectURL(url);
-      resolve({ dataUrl: canvas.toDataURL("image/png"), width: bbox.width, height: bbox.height });
+      resolve({
+        dataUrl: canvas.toDataURL("image/png"),
+        fullBbox,
+        focusBbox,
+      });
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
@@ -257,19 +265,48 @@ export async function exportTerritoryPDF(
   }
 
   try {
-    const { dataUrl: mapImage, width: cropW, height: cropH } =
-      await svgToImage(svgEl, assignedFips);
-    const mapAspect = cropW / cropH;
-    let drawW = mapAreaWidth;
-    let drawH = drawW / mapAspect;
-    if (drawH > mapAreaHeight) {
-      drawH = mapAreaHeight;
-      drawW = drawH * mapAspect;
-    }
-    const mapX = (pageW - drawW) / 2;
-    const mapY = mapTop + (mapAreaHeight - drawH) / 2;
-    pdf.addImage(mapImage, "PNG", mapX, mapY, drawW, drawH);
-    mapBottomY = mapY + drawH;
+    const { dataUrl: mapImage, fullBbox, focusBbox } = await svgToImage(
+      svgEl,
+      assignedFips
+    );
+
+    // Clamp map to the mapArea rectangle — anything that falls outside gets
+    // clipped by the page, so we can scale the map up aggressively and still
+    // have surrounding context bleed toward the edges without crashing into
+    // the header or key.
+    const mapAreaX = margin;
+    const mapAreaY = mapTop;
+
+    const box = focusBbox ?? fullBbox;
+    // Pick a scale so the focus box fits in the mapArea (fit, not fill, so
+    // neither dimension overflows the map rectangle before clipping).
+    const scale = Math.min(
+      mapAreaWidth / box.width,
+      mapAreaHeight / box.height
+    );
+
+    // Full rendered image size on the PDF
+    const imgW = fullBbox.width * scale;
+    const imgH = fullBbox.height * scale;
+
+    // Position: put the center of the focus box at the center of the mapArea
+    const focusCenterX = box.x + box.width / 2;
+    const focusCenterY = box.y + box.height / 2;
+    const mapCenterX = mapAreaX + mapAreaWidth / 2;
+    const mapCenterY = mapAreaY + mapAreaHeight / 2;
+    const imgX = mapCenterX - (focusCenterX - fullBbox.x) * scale;
+    const imgY = mapCenterY - (focusCenterY - fullBbox.y) * scale;
+
+    // Clip to the map rectangle so the overflow of the full region gets cut
+    // at the map area's edges instead of bleeding into header/key/footer.
+    pdf.saveGraphicsState();
+    pdf.rect(mapAreaX, mapAreaY, mapAreaWidth, mapAreaHeight);
+    pdf.clip();
+    pdf.discardPath();
+    pdf.addImage(mapImage, "PNG", imgX, imgY, imgW, imgH);
+    pdf.restoreGraphicsState();
+
+    mapBottomY = mapAreaY + mapAreaHeight;
   } catch {
     pdf.setTextColor(150, 150, 150);
     pdf.setFontSize(12);
