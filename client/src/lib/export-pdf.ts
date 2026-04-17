@@ -120,67 +120,101 @@ export async function exportTerritoryPDF(
   const pageH = pdf.internal.pageSize.getHeight(); // 215.9mm
   const margin = 12;
 
-  // --- HEADER ---
-  // Gold accent bar at top
-  pdf.setFillColor(...gold);
-  pdf.rect(0, 0, pageW, 3, "F");
-
-  // Deep teal header background
-  pdf.setFillColor(...deepTeal);
-  pdf.rect(0, 3, pageW, 22, "F");
-
-  // Logo
-  try {
-    const logoData = await loadImageAsDataUrl("./csi-logo.png");
-    // Logo is roughly 4:1 aspect ratio
-    const logoH = 14;
-    const logoW = logoH * 3.8;
-    pdf.addImage(logoData, "PNG", margin, 6.5, logoW, logoH);
-  } catch {
-    // Fallback: text if logo fails to load
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(14);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("CONNECTOR SPECIALISTS INCORPORATED", margin, 17);
-  }
-
-  // Title on the right side of header
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(16);
-  pdf.setFont("helvetica", "bold");
-  pdf.text("Territory Map", pageW - margin, 12, { align: "right" });
-  pdf.setFontSize(9);
-  pdf.setFont("helvetica", "normal");
   const date = new Date().toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
-  pdf.text(date, pageW - margin, 18, { align: "right" });
 
-  // Gold accent line under header
-  pdf.setFillColor(...gold);
-  pdf.rect(0, 25, pageW, 1.5, "F");
+  // Load the logo once — both pages use it
+  let logoData: string | null = null;
+  try {
+    logoData = await loadImageAsDataUrl("./csi-logo.png");
+  } catch {
+    logoData = null;
+  }
 
-  // --- LAYOUT: full-width map on top, key grid below ---
+  // Helper: draw the branded header on the current page
+  const drawHeader = (title: string) => {
+    // Gold accent bar at top
+    pdf.setFillColor(...gold);
+    pdf.rect(0, 0, pageW, 3, "F");
+
+    // Deep teal header background
+    pdf.setFillColor(...deepTeal);
+    pdf.rect(0, 3, pageW, 22, "F");
+
+    // Logo
+    if (logoData) {
+      const logoH = 14;
+      const logoW = logoH * 3.8;
+      pdf.addImage(logoData, "PNG", margin, 6.5, logoW, logoH);
+    } else {
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("CONNECTOR SPECIALISTS INCORPORATED", margin, 17);
+    }
+
+    // Title on the right
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(16);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(title, pageW - margin, 12, { align: "right" });
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(date, pageW - margin, 18, { align: "right" });
+
+    // Gold accent line under header
+    pdf.setFillColor(...gold);
+    pdf.rect(0, 25, pageW, 1.5, "F");
+  };
+
+  // Helper: draw the footer on the current page
+  const drawFooter = () => {
+    pdf.setFillColor(...gold);
+    pdf.rect(0, pageH - 6, pageW, 1, "F");
+
+    pdf.setFontSize(7);
+    pdf.setTextColor(100, 100, 100);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(
+      "Connector Specialists Incorporated | Territory Map",
+      margin,
+      pageH - 3
+    );
+    pdf.text(`Generated ${date}`, pageW - margin, pageH - 3, { align: "right" });
+  };
+
+  // Helper: truncate a string so it fits a given px width
+  const fit = (s: string, maxW: number): string => {
+    if (pdf.getTextWidth(s) <= maxW) return s;
+    let out = s;
+    while (out.length > 0 && pdf.getTextWidth(out + "...") > maxW) {
+      out = out.slice(0, -1);
+    }
+    return out + "...";
+  };
+
+  // === PAGE 1: Map + compact legend ===
+  drawHeader("Territory Map");
+
+  // --- LAYOUT: full-width map on top, compact key below ---
   const mapTop = 28;
   const footerHeight = 8;
   const mapAreaWidth = pageW - margin * 2;
 
-  // Calculate how tall the key will be based on territory count + whether
-  // any rep has contact info (phone or email). Contact info adds vertical
-  // space per entry so names aren't crowded.
-  const hasContactInfo = territories.some((t) => t.phone || t.email);
+  // Compact key: just swatch + name. Contact info moves to page 2.
   const keyCols = Math.min(territories.length || 1, 4);
   const keyRows = Math.max(1, Math.ceil(territories.length / keyCols));
-  const keyHeaderHeight = 7;                     // teal bar
-  const keyRowHeight = hasContactInfo ? 13 : 7;  // each row of entries
-  const keyPadding = 6;                          // gap above entries + space below
+  const keyHeaderHeight = 7;       // teal bar
+  const keyRowHeight = 5.5;        // compact row
+  const keyPadding = 5;
   const keyHeight = keyHeaderHeight + keyPadding + keyRows * keyRowHeight;
 
-  const mapAreaHeight = pageH - mapTop - keyHeight - footerHeight - 4; // 4mm gap between map and key
+  const mapAreaHeight = pageH - mapTop - keyHeight - footerHeight - 4;
 
-  let mapBottomY = mapTop + mapAreaHeight; // where the map ends
+  let mapBottomY = mapTop + mapAreaHeight;
 
   try {
     const { dataUrl: mapImage, width: cropW, height: cropH } = await svgToImage(svgEl);
@@ -191,7 +225,6 @@ export async function exportTerritoryPDF(
       drawH = mapAreaHeight;
       drawW = drawH * mapAspect;
     }
-    // Center the map horizontally
     const mapX = (pageW - drawW) / 2;
     const mapY = mapTop + (mapAreaHeight - drawH) / 2;
     pdf.addImage(mapImage, "PNG", mapX, mapY, drawW, drawH);
@@ -204,10 +237,9 @@ export async function exportTerritoryPDF(
     });
   }
 
-  // --- TERRITORY KEY (horizontal grid below map) ---
+  // --- COMPACT KEY (horizontal grid below map) ---
   const keyTop = mapBottomY + 4;
 
-  // Key header bar — full width
   pdf.setFillColor(...deepTeal);
   pdf.roundedRect(margin, keyTop, pageW - margin * 2, 7, 2, 2, "F");
   pdf.setTextColor(255, 255, 255);
@@ -215,19 +247,8 @@ export async function exportTerritoryPDF(
   pdf.setFont("helvetica", "bold");
   pdf.text("TERRITORY KEY", pageW / 2, keyTop + 4.8, { align: "center" });
 
-  // Arrange territories in a multi-column grid
   const colWidth = (pageW - margin * 2) / keyCols;
   const entryTop = keyTop + keyHeaderHeight + 3;
-
-  // Helper: truncate a string so it fits a given px width
-  const fit = (s: string, maxW: number): string => {
-    if (pdf.getTextWidth(s) <= maxW) return s;
-    let out = s;
-    while (out.length > 0 && pdf.getTextWidth(out + "...") > maxW) {
-      out = out.slice(0, -1);
-    }
-    return out + "...";
-  };
 
   territories.forEach((t, i) => {
     const col = i % keyCols;
@@ -236,55 +257,122 @@ export async function exportTerritoryPDF(
     const y = entryTop + row * keyRowHeight;
 
     // Color swatch
-    const hex = t.color;
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
+    const [r, g, b] = [
+      parseInt(t.color.slice(1, 3), 16),
+      parseInt(t.color.slice(3, 5), 16),
+      parseInt(t.color.slice(5, 7), 16),
+    ];
     pdf.setFillColor(r, g, b);
-    pdf.roundedRect(x, y, 4, 4, 0.8, 0.8, "F");
+    pdf.roundedRect(x, y, 3.5, 3.5, 0.7, 0.7, "F");
 
-    const textX = x + 7;
-    const textMaxW = colWidth - 9;
-
-    // Territory name (bold)
+    // Name
     pdf.setTextColor(30, 30, 30);
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(11);
-    pdf.text(fit(t.name, textMaxW), textX, y + 3.5);
-
-    // Contact info — phone on one line, email on the next
-    if (hasContactInfo) {
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(8);
-      pdf.setTextColor(100, 100, 100);
-      if (t.phone) {
-        pdf.text(fit(t.phone, textMaxW), textX, y + 7.5);
-      }
-      if (t.email) {
-        pdf.text(fit(t.email, textMaxW), textX, y + 11);
-      }
-    }
+    pdf.setFontSize(10);
+    const textX = x + 6;
+    const textMaxW = colWidth - 8;
+    pdf.text(fit(t.name, textMaxW), textX, y + 3);
   });
 
-  // --- FOOTER ---
-  pdf.setFillColor(...gold);
-  pdf.rect(0, pageH - 6, pageW, 1, "F");
+  drawFooter();
 
-  pdf.setFontSize(7);
-  pdf.setTextColor(100, 100, 100);
-  pdf.setFont("helvetica", "normal");
-  pdf.text(
-    "Connector Specialists Incorporated | Territory Map",
-    margin,
-    pageH - 3
-  );
-  pdf.text(
-    `Generated ${date}`,
-    pageW - margin,
-    pageH - 3,
-    { align: "right" }
-  );
+  // === PAGE 2: Rep directory with full contact details ===
+  // Only add if any rep has something to show beyond name
+  const hasDetails = territories.some((t) => t.title || t.phone || t.email);
+  if (hasDetails) {
+    pdf.addPage();
+    drawHeader("Sales Representatives");
 
-  // Save
+    // Two-column directory layout
+    const dirTop = 34;
+    const dirCols = 2;
+    const dirColGap = 8;
+    const dirColWidth = (pageW - margin * 2 - dirColGap) / dirCols;
+    const cardHeight = 24;
+    const cardGap = 4;
+    const cardsPerCol = Math.max(
+      1,
+      Math.floor((pageH - dirTop - footerHeight - 2) / (cardHeight + cardGap))
+    );
+
+    territories.forEach((t, i) => {
+      const col = Math.floor(i / cardsPerCol);
+      const row = i % cardsPerCol;
+      if (col >= dirCols) return; // overflow guard
+
+      const cardX = margin + col * (dirColWidth + dirColGap);
+      const cardY = dirTop + row * (cardHeight + cardGap);
+
+      // Card background (very light)
+      pdf.setFillColor(248, 250, 252);
+      pdf.setDrawColor(226, 232, 240);
+      pdf.setLineWidth(0.2);
+      pdf.roundedRect(cardX, cardY, dirColWidth, cardHeight, 1.5, 1.5, "FD");
+
+      // Colored accent bar on the left
+      const [r, g, b] = [
+        parseInt(t.color.slice(1, 3), 16),
+        parseInt(t.color.slice(3, 5), 16),
+        parseInt(t.color.slice(5, 7), 16),
+      ];
+      pdf.setFillColor(r, g, b);
+      pdf.rect(cardX, cardY, 1.5, cardHeight, "F");
+
+      const textX = cardX + 5;
+      const textMaxW = dirColWidth - 7;
+
+      // Name
+      pdf.setTextColor(30, 30, 30);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.text(fit(t.name, textMaxW), textX, cardY + 5);
+
+      // Title (if present)
+      let lineY = cardY + 9;
+      if (t.title) {
+        pdf.setFont("helvetica", "italic");
+        pdf.setFontSize(9);
+        pdf.setTextColor(100, 100, 100);
+        pdf.text(fit(t.title, textMaxW), textX, lineY);
+        lineY += 4;
+      }
+
+      // Phone
+      if (t.phone) {
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        pdf.setTextColor(60, 60, 60);
+        pdf.text("Phone:", textX, lineY);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(30, 30, 30);
+        pdf.text(fit(t.phone, textMaxW - 15), textX + 13, lineY);
+        lineY += 4;
+      }
+
+      // Email
+      if (t.email) {
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        pdf.setTextColor(60, 60, 60);
+        pdf.text("Email:", textX, lineY);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(30, 30, 30);
+        pdf.text(fit(t.email, textMaxW - 13), textX + 11, lineY);
+        lineY += 4;
+      }
+
+      // Counties count (always shown, bottom-right of the card)
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      pdf.setTextColor(120, 120, 120);
+      const countText = `${t.countyFips.length} ${t.countyFips.length === 1 ? "county" : "counties"}`;
+      pdf.text(countText, cardX + dirColWidth - 2, cardY + cardHeight - 2, {
+        align: "right",
+      });
+    });
+
+    drawFooter();
+  }
+
   pdf.save("territory-map.pdf");
 }
