@@ -189,14 +189,26 @@ export default function TerritoryPanel({
                           selectedColor === c.value
                             ? "border-foreground scale-110"
                             : "border-transparent hover:scale-105"
-                        } ${isUsed ? "opacity-50 cursor-not-allowed" : ""}`}
+                        } ${isUsed && !showColorManager ? "opacity-50 cursor-not-allowed" : ""}`}
                         style={{ backgroundColor: c.value }}
                         onClick={() => {
+                          // In manage mode, clicking a swatch copies its hex
+                          // into the edit field so users can see / reuse it.
+                          if (showColorManager) {
+                            setHexInput(c.value);
+                            return;
+                          }
                           if (isUsed) return;
                           onColorChange(c.value);
                         }}
-                        disabled={isUsed}
-                        title={isUsed ? `${c.name} (already used)` : c.name}
+                        disabled={isUsed && !showColorManager}
+                        title={
+                          showColorManager
+                            ? `${c.name} (${c.value}) — click to copy hex`
+                            : isUsed
+                            ? `${c.name} (already used)`
+                            : c.name
+                        }
                         data-testid={`color-${c.name.toLowerCase()}`}
                       />
                       {isUsed && (
