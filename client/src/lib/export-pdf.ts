@@ -1,4 +1,4 @@
-import jsPDF from "jspdf";
+import jsPDF, { GState } from "jspdf";
 import type { ClientTerritory } from "@/pages/home";
 
 interface CountyInfo {
@@ -151,7 +151,10 @@ async function loadImageAsDataUrl(src: string): Promise<string> {
 export async function exportTerritoryPDF(
   svgEl: SVGSVGElement,
   territories: ClientTerritory[],
-  countyNames: Record<string, CountyInfo>
+  countyNames: Record<string, CountyInfo>,
+  /** Fill opacity used for territory colors on the map — matches the app so
+   *  key swatches and card accents look identical in the PDF. */
+  territoryOpacity = 1
 ) {
   // Brand colors
   const deepTeal = [38, 75, 93] as const; // #264b5d
@@ -253,6 +256,12 @@ export async function exportTerritoryPDF(
     return raw.trim();
   };
 
+  // Graphics state that matches the on-screen territory opacity, so the key
+  // swatches and card accent bars have the same visual weight as the colors
+  // on the map itself.
+  const territoryGState = new GState({ opacity: territoryOpacity });
+  const solidGState = new GState({ opacity: 1 });
+
   // === PAGE 1: Map + compact legend ===
   drawHeader("Territory Map");
 
@@ -352,14 +361,16 @@ export async function exportTerritoryPDF(
     const x = margin + col * colWidth;
     const y = entryTop + row * keyRowHeight;
 
-    // Color swatch
+    // Color swatch — matches the map opacity
     const [r, g, b] = [
       parseInt(t.color.slice(1, 3), 16),
       parseInt(t.color.slice(3, 5), 16),
       parseInt(t.color.slice(5, 7), 16),
     ];
+    pdf.setGState(territoryGState);
     pdf.setFillColor(r, g, b);
     pdf.roundedRect(x, y, 3.5, 3.5, 0.7, 0.7, "F");
+    pdf.setGState(solidGState);
 
     // Name
     pdf.setTextColor(30, 30, 30);
@@ -405,14 +416,16 @@ export async function exportTerritoryPDF(
       pdf.setLineWidth(0.2);
       pdf.roundedRect(cardX, cardY, dirColWidth, cardHeight, 1.5, 1.5, "FD");
 
-      // Colored accent bar on the left
+      // Colored accent bar on the left — matches the map opacity
       const [r, g, b] = [
         parseInt(t.color.slice(1, 3), 16),
         parseInt(t.color.slice(3, 5), 16),
         parseInt(t.color.slice(5, 7), 16),
       ];
+      pdf.setGState(territoryGState);
       pdf.setFillColor(r, g, b);
       pdf.rect(cardX, cardY, 1.5, cardHeight, "F");
+      pdf.setGState(solidGState);
 
       const textX = cardX + 5;
       const textMaxW = dirColWidth - 7;

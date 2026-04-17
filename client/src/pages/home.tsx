@@ -278,8 +278,8 @@ export default function Home() {
       "[data-testid='territory-map-svg']"
     ) as SVGSVGElement | null;
     if (!svgEl) return;
-    exportTerritoryPDF(svgEl, territories, countyNames);
-  }, [territories, countyNames]);
+    exportTerritoryPDF(svgEl, territories, countyNames, territoryOpacity);
+  }, [territories, countyNames, territoryOpacity]);
 
   const handleExport = useCallback(() => {
     const data = territories.map((t) => ({
