@@ -45,6 +45,9 @@ const STATE_ABBR: Record<string, string> = {
   "40": "OK",
   "47": "TN",
   "12": "FL",
+  "13": "GA",
+  "37": "NC",
+  "45": "SC",
 };
 
 export default function TerritoryMap({

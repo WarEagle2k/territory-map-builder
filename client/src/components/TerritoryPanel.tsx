@@ -8,13 +8,16 @@ import {
   Trash2,
   Plus,
   Save,
-  Type,
   X,
   ChevronDown,
   ChevronUp,
   MapPin,
   Pencil,
   Check,
+  Info,
+  Phone,
+  Mail,
+  Building2,
 } from "lucide-react";
 import type { ClientTerritory } from "@/pages/home";
 
@@ -39,6 +42,7 @@ interface TerritoryPanelProps {
   onEditTerritoryCounties: (id: number) => void;
   onSaveTerritoryCounties: () => void;
   onCancelEditCounties: () => void;
+  onOpenDetails: (id: number) => void;
   editingTerritoryId: number | null;
   countyNames: Record<string, { name: string; state: string }>;
   /** Match on-map territory opacity for visual consistency */
@@ -61,13 +65,12 @@ export default function TerritoryPanel({
   onEditTerritoryCounties,
   onSaveTerritoryCounties,
   onCancelEditCounties,
+  onOpenDetails,
   editingTerritoryId,
   countyNames,
   swatchOpacity = 1,
 }: TerritoryPanelProps) {
   const [territoryName, setTerritoryName] = useState("");
-  const [editingNameId, setEditingNameId] = useState<number | null>(null);
-  const [editName, setEditName] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [hexInput, setHexInput] = useState("#3b82f6");
   const [showColorManager, setShowColorManager] = useState(false);
@@ -366,122 +369,113 @@ export default function TerritoryPanel({
                     className="w-3 h-3 rounded-full flex-shrink-0 ring-1 ring-black/10"
                     style={{ backgroundColor: t.color, opacity: swatchOpacity }}
                   />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{t.name}</div>
+                    {(t.title || t.branch) && (
+                      <div className="text-[10px] text-muted-foreground truncate">
+                        {[t.title, t.branch].filter(Boolean).join(" · ")}
+                      </div>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="text-xs flex-shrink-0">
+                    {isBeingEdited ? selectedCounties.size : t.countyFips.length}
+                  </Badge>
 
-                  {editingNameId === t.id ? (
-                    <div className="flex-1 flex gap-1">
-                      <Input
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="h-7 text-xs"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            onUpdateTerritory(t.id, { name: editName });
-                            setEditingNameId(null);
-                          }
-                        }}
-                        data-testid="edit-name-input"
-                      />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 px-2"
-                        onClick={() => {
-                          onUpdateTerritory(t.id, { name: editName });
-                          setEditingNameId(null);
-                        }}
-                        data-testid="confirm-edit-btn"
-                      >
-                        <Save className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 px-2"
-                        onClick={() => setEditingNameId(null)}
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <span className="flex-1 text-sm font-medium truncate">
-                        {t.name}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="text-xs flex-shrink-0"
-                      >
-                        {isBeingEdited ? selectedCounties.size : t.countyFips.length}
-                      </Badge>
-                    </>
-                  )}
-
-                  {editingNameId !== t.id && (
-                    <div className="flex gap-0.5">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0"
-                        onClick={() =>
-                          setExpandedId(isExpanded ? null : t.id)
+                  <div className="flex gap-0.5">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => setExpandedId(isExpanded ? null : t.id)}
+                      data-testid={`expand-territory-${t.id}`}
+                      title={isExpanded ? "Collapse" : "Expand"}
+                    >
+                      {isExpanded ? (
+                        <ChevronUp className="w-3 h-3" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3" />
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => {
+                        if (isBeingEdited) {
+                          onCancelEditCounties();
+                        } else {
+                          onEditTerritoryCounties(t.id);
                         }
-                        data-testid={`expand-territory-${t.id}`}
-                      >
-                        {isExpanded ? (
-                          <ChevronUp className="w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="w-3 h-3" />
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0"
-                        onClick={() => {
-                          if (isBeingEdited) {
-                            // Already editing counties, cancel
-                            onCancelEditCounties();
-                          } else {
-                            onEditTerritoryCounties(t.id);
-                          }
-                        }}
-                        title="Edit counties"
-                        data-testid={`edit-counties-${t.id}`}
-                      >
-                        <Pencil className={`w-3 h-3 ${isBeingEdited ? "text-primary" : ""}`} />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0"
-                        onClick={() => {
-                          setEditingNameId(t.id);
-                          setEditName(t.name);
-                        }}
-                        title="Rename"
-                        data-testid={`edit-territory-${t.id}`}
-                      >
-                        <Type className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-destructive"
-                        onClick={() => onDeleteTerritory(t.id)}
-                        data-testid={`delete-territory-${t.id}`}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  )}
+                      }}
+                      title="Edit counties"
+                      data-testid={`edit-counties-${t.id}`}
+                    >
+                      <Pencil className={`w-3 h-3 ${isBeingEdited ? "text-primary" : ""}`} />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => onOpenDetails(t.id)}
+                      title="Edit rep details"
+                      data-testid={`rep-details-${t.id}`}
+                    >
+                      <Info className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-destructive"
+                      onClick={() => onDeleteTerritory(t.id)}
+                      data-testid={`delete-territory-${t.id}`}
+                      title="Delete territory"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
                 </div>
 
                 {isExpanded && (
-                  <div className="mt-2 pl-6">
-                    <div className="text-xs text-muted-foreground space-y-0.5 max-h-32 overflow-y-auto">
-                      {t.countyFips.map((fips) => (
-                        <div key={fips}>{getCountyLabel(fips)}</div>
-                      ))}
+                  <div className="mt-3 pl-6 space-y-3">
+                    {/* Contact info */}
+                    {(t.branch || t.phone || t.email) && (
+                      <div className="space-y-1">
+                        {t.branch && (
+                          <div className="flex items-center gap-2 text-xs text-foreground">
+                            <Building2 className="w-3 h-3 flex-shrink-0 text-muted-foreground" />
+                            <span className="truncate">{t.branch}</span>
+                          </div>
+                        )}
+                        {t.phone && (
+                          <a
+                            href={`tel:${t.phone}`}
+                            className="flex items-center gap-2 text-xs text-foreground hover:text-primary transition-colors"
+                          >
+                            <Phone className="w-3 h-3 flex-shrink-0 text-muted-foreground" />
+                            <span className="truncate">{t.phone}</span>
+                          </a>
+                        )}
+                        {t.email && (
+                          <a
+                            href={`mailto:${t.email}`}
+                            className="flex items-center gap-2 text-xs text-foreground hover:text-primary transition-colors"
+                          >
+                            <Mail className="w-3 h-3 flex-shrink-0 text-muted-foreground" />
+                            <span className="truncate">{t.email}</span>
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {/* County list */}
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                        Counties ({t.countyFips.length})
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-0.5 max-h-32 overflow-y-auto">
+                        {t.countyFips.map((fips) => (
+                          <div key={fips}>{getCountyLabel(fips)}</div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -490,6 +484,7 @@ export default function TerritoryPanel({
           })}
         </div>
       </div>
+
     </div>
   );
 }
