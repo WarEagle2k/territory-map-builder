@@ -421,7 +421,7 @@ export default function TerritoryMap({
         const fips = d3.select(this).attr("data-fips");
         if (selectedCounties.has(fips)) return 0.6;
         const territory = ctMap.get(fips);
-        return territory ? 0.65 : 1;
+        return territory ? 0.6 : 1;
       });
   }, [
     geometryReady,
