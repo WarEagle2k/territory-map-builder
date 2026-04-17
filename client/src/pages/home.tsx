@@ -104,6 +104,8 @@ export default function Home() {
   const [selectedColor, setSelectedColor] = useState(colors[0]?.value ?? "#3b82f6");
   const [editingTerritoryId, setEditingTerritoryId] = useState<number | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  // TEMPORARY opacity tuning slider — remove once we settle on a value
+  const [territoryOpacity, setTerritoryOpacity] = useState(0.5);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Persistence ---
@@ -454,7 +456,30 @@ export default function Home() {
             onCountiesDrag={handleCountiesDrag}
             highlightTerritoryId={highlightTerritoryId}
             editingTerritoryId={editingTerritoryId}
+            territoryOpacity={territoryOpacity}
           />
+
+          {/* TEMP: opacity tuner — remove once we pick a final value */}
+          <div
+            className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm border border-border rounded-lg shadow-md px-3 py-2 flex items-center gap-3 z-20"
+            data-testid="opacity-tuner"
+          >
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Opacity
+            </label>
+            <input
+              type="range"
+              min="0.1"
+              max="1"
+              step="0.05"
+              value={territoryOpacity}
+              onChange={(e) => setTerritoryOpacity(parseFloat(e.target.value))}
+              className="w-40 accent-[hsl(var(--brand-teal))]"
+            />
+            <span className="text-xs font-mono tabular-nums text-foreground w-10 text-right">
+              {territoryOpacity.toFixed(2)}
+            </span>
+          </div>
           <MapLegend
             territories={territories}
             onHighlight={setHighlightTerritoryId}

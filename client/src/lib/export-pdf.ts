@@ -164,10 +164,18 @@ export async function exportTerritoryPDF(
 
   // --- LAYOUT: full-width map on top, key grid below ---
   const mapTop = 28;
-  const keyHeight = 25; // reserve space at bottom for key
   const footerHeight = 8;
   const mapAreaWidth = pageW - margin * 2;
-  const mapAreaHeight = pageH - mapTop - keyHeight - footerHeight;
+
+  // Calculate how tall the key will be based on territory count
+  const keyCols = Math.min(territories.length || 1, 4);
+  const keyRows = Math.max(1, Math.ceil(territories.length / keyCols));
+  const keyHeaderHeight = 7; // teal bar
+  const keyRowHeight = 7;    // each row of entries
+  const keyPadding = 6;      // gap above entries + space below
+  const keyHeight = keyHeaderHeight + keyPadding + keyRows * keyRowHeight;
+
+  const mapAreaHeight = pageH - mapTop - keyHeight - footerHeight - 4; // 4mm gap between map and key
 
   let mapBottomY = mapTop + mapAreaHeight; // where the map ends
 
@@ -205,15 +213,14 @@ export async function exportTerritoryPDF(
   pdf.text("TERRITORY KEY", pageW / 2, keyTop + 4.8, { align: "center" });
 
   // Arrange territories in a multi-column grid
-  const cols = Math.min(territories.length, 4); // up to 4 columns
-  const colWidth = (pageW - margin * 2) / cols;
-  const entryTop = keyTop + 10;
+  const colWidth = (pageW - margin * 2) / keyCols;
+  const entryTop = keyTop + keyHeaderHeight + 3;
 
   territories.forEach((t, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
+    const col = i % keyCols;
+    const row = Math.floor(i / keyCols);
     const x = margin + col * colWidth;
-    const y = entryTop + row * 7;
+    const y = entryTop + row * keyRowHeight;
 
     // Color swatch
     const hex = t.color;
