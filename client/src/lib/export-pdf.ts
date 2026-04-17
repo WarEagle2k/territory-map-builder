@@ -397,8 +397,8 @@ export async function exportTerritoryPDF(
     const dirCols = 2;
     const dirColGap = 8;
     const dirColWidth = (pageW - margin * 2 - dirColGap) / dirCols;
-    const cardHeight = 24;
-    const cardGap = 4;
+    const cardHeight = 26;
+    const cardGap = 2;
     const cardsPerCol = Math.max(
       1,
       Math.floor((pageH - dirTop - footerHeight - 2) / (cardHeight + cardGap))
@@ -438,14 +438,24 @@ export async function exportTerritoryPDF(
       pdf.setFontSize(12);
       pdf.text(fit(t.name, textMaxW), textX, cardY + 5);
 
-      // Title · Branch (both italic, gray — combine to save vertical space)
+      // Title (italic, gray)
       let lineY = cardY + 9;
-      const subtitleParts = [t.title, t.branch].filter(Boolean).join("  ·  ");
-      if (subtitleParts) {
+      if (t.title) {
         pdf.setFont("helvetica", "italic");
         pdf.setFontSize(9);
         pdf.setTextColor(100, 100, 100);
-        pdf.text(fit(subtitleParts, textMaxW), textX, lineY);
+        pdf.text(fit(t.title, textMaxW), textX, lineY);
+        lineY += 4;
+      }
+
+      // Branch (labeled, same style as Phone/Email)
+      if (t.branch) {
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        pdf.setTextColor(60, 60, 60);
+        pdf.text("Branch:", textX, lineY);
+        pdf.setTextColor(30, 30, 30);
+        pdf.text(fit(t.branch, textMaxW - 16), textX + 14, lineY);
         lineY += 4;
       }
 
