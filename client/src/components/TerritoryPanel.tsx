@@ -8,7 +8,7 @@ import {
   Trash2,
   Plus,
   Save,
-  Edit2,
+  Type,
   X,
   ChevronDown,
   ChevronUp,
@@ -446,7 +446,7 @@ export default function TerritoryPanel({
                         title="Rename"
                         data-testid={`edit-territory-${t.id}`}
                       >
-                        <Edit2 className="w-3 h-3" />
+                        <Type className="w-3 h-3" />
                       </Button>
                       <Button
                         size="sm"
