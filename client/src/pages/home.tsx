@@ -536,9 +536,15 @@ export default function Home() {
       {detailsId != null && (() => {
         const territory = territories.find((t) => t.id === detailsId);
         if (!territory) return null;
+        // Colors used by OTHER territories — the one being edited keeps its own
+        const usedByOthers = new Set(
+          territories.filter((t) => t.id !== detailsId).map((t) => t.color)
+        );
         return (
           <RepDetailsDialog
             territory={territory}
+            colors={colors}
+            usedColors={usedByOthers}
             onSave={(updates) => handleUpdateTerritory(territory.id, updates)}
             onClose={() => setDetailsId(null)}
           />

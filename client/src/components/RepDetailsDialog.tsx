@@ -4,10 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ClientTerritory } from "@/pages/home";
 
+interface ColorOption {
+  name: string;
+  value: string;
+}
+
 interface RepDetailsDialogProps {
   territory: ClientTerritory;
+  colors: ColorOption[];
+  /** Colors already used by OTHER territories (excluded: the one being edited) */
+  usedColors: Set<string>;
   onSave: (
-    updates: Partial<Pick<ClientTerritory, "name" | "title" | "phone" | "email">>
+    updates: Partial<
+      Pick<ClientTerritory, "name" | "title" | "phone" | "email" | "color">
+    >
   ) => void;
   onClose: () => void;
 }
@@ -18,6 +28,8 @@ interface RepDetailsDialogProps {
  */
 export default function RepDetailsDialog({
   territory,
+  colors,
+  usedColors,
   onSave,
   onClose,
 }: RepDetailsDialogProps) {
@@ -25,6 +37,7 @@ export default function RepDetailsDialog({
   const [title, setTitle] = useState(territory.title ?? "");
   const [phone, setPhone] = useState(territory.phone ?? "");
   const [email, setEmail] = useState(territory.email ?? "");
+  const [color, setColor] = useState(territory.color);
   const firstInputRef = useRef<HTMLInputElement>(null);
 
   // Focus the first field on mount
@@ -50,6 +63,7 @@ export default function RepDetailsDialog({
       title: title.trim() || undefined,
       phone: phone.trim() || undefined,
       email: email.trim() || undefined,
+      color,
     });
     onClose();
   };
@@ -74,8 +88,8 @@ export default function RepDetailsDialog({
         >
           <div className="flex items-center gap-3 min-w-0">
             <div
-              className="w-3 h-3 rounded-sm flex-shrink-0 ring-1 ring-white/25"
-              style={{ backgroundColor: territory.color }}
+              className="w-3 h-3 rounded-sm flex-shrink-0 ring-1 ring-white/25 transition-colors"
+              style={{ backgroundColor: color }}
             />
             <h2
               id="rep-details-title"
@@ -118,6 +132,41 @@ export default function RepDetailsDialog({
               placeholder="e.g. Regional Sales Manager"
               data-testid="rep-title-input"
             />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1.5">
+              Color
+            </label>
+            <div className="flex flex-wrap gap-1.5" data-testid="rep-color-picker">
+              {colors.map((c) => {
+                const isUsedByOther = usedColors.has(c.value) && c.value !== territory.color;
+                const isSelected = color === c.value;
+                return (
+                  <div key={c.value} className="relative w-6 h-6 flex items-center justify-center">
+                    <button
+                      type="button"
+                      className={`w-6 h-6 rounded-full border-2 transition-transform ${
+                        isSelected
+                          ? "border-foreground scale-110"
+                          : "border-transparent hover:scale-105"
+                      } ${isUsedByOther ? "opacity-50 cursor-not-allowed" : ""}`}
+                      style={{ backgroundColor: c.value }}
+                      disabled={isUsedByOther}
+                      title={isUsedByOther ? `${c.name} (already used)` : c.name}
+                      onClick={() => setColor(c.value)}
+                      data-testid={`rep-color-${c.name.toLowerCase()}`}
+                    />
+                    {isUsedByOther && (
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute top-1/2 left-1/2 w-[22px] h-[2px] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-foreground rounded-full shadow-[0_0_0_1px_rgba(255,255,255,0.8)]"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
