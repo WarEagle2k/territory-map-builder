@@ -18,7 +18,6 @@ import {
   Phone,
   Mail,
 } from "lucide-react";
-import RepDetailsDialog from "@/components/RepDetailsDialog";
 import type { ClientTerritory } from "@/pages/home";
 
 interface ColorOption {
@@ -42,6 +41,7 @@ interface TerritoryPanelProps {
   onEditTerritoryCounties: (id: number) => void;
   onSaveTerritoryCounties: () => void;
   onCancelEditCounties: () => void;
+  onOpenDetails: (id: number) => void;
   editingTerritoryId: number | null;
   countyNames: Record<string, { name: string; state: string }>;
   /** Match on-map territory opacity for visual consistency */
@@ -64,13 +64,13 @@ export default function TerritoryPanel({
   onEditTerritoryCounties,
   onSaveTerritoryCounties,
   onCancelEditCounties,
+  onOpenDetails,
   editingTerritoryId,
   countyNames,
   swatchOpacity = 1,
 }: TerritoryPanelProps) {
   const [territoryName, setTerritoryName] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [detailsId, setDetailsId] = useState<number | null>(null);
   const [hexInput, setHexInput] = useState("#3b82f6");
   const [showColorManager, setShowColorManager] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
@@ -415,7 +415,7 @@ export default function TerritoryPanel({
                       size="sm"
                       variant="ghost"
                       className="h-7 w-7 p-0"
-                      onClick={() => setDetailsId(t.id)}
+                      onClick={() => onOpenDetails(t.id)}
                       title="Edit rep details"
                       data-testid={`rep-details-${t.id}`}
                     >
@@ -478,17 +478,6 @@ export default function TerritoryPanel({
         </div>
       </div>
 
-      {detailsId != null && (() => {
-        const territory = territories.find((x) => x.id === detailsId);
-        if (!territory) return null;
-        return (
-          <RepDetailsDialog
-            territory={territory}
-            onSave={(updates) => onUpdateTerritory(territory.id, updates)}
-            onClose={() => setDetailsId(null)}
-          />
-        );
-      })()}
     </div>
   );
 }
