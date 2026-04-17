@@ -16,7 +16,7 @@ interface RepDetailsDialogProps {
   usedColors: Set<string>;
   onSave: (
     updates: Partial<
-      Pick<ClientTerritory, "name" | "title" | "phone" | "email" | "color">
+      Pick<ClientTerritory, "name" | "title" | "branch" | "phone" | "email" | "color">
     >
   ) => void;
   onClose: () => void;
@@ -74,6 +74,7 @@ export default function RepDetailsDialog({
 }: RepDetailsDialogProps) {
   const [name, setName] = useState(territory.name);
   const [title, setTitle] = useState(territory.title ?? "");
+  const [branch, setBranch] = useState(territory.branch ?? "");
   const [phone, setPhone] = useState(territory.phone ?? "");
   const [email, setEmail] = useState(territory.email ?? "");
   const [color, setColor] = useState(territory.color);
@@ -104,6 +105,7 @@ export default function RepDetailsDialog({
     onSave({
       name: name.trim(),
       title: title.trim() || undefined,
+      branch: branch.trim() || undefined,
       phone: phone.trim() ? normalizePhone(phone) : undefined,
       email: email.trim() || undefined,
       color,
@@ -165,16 +167,29 @@ export default function RepDetailsDialog({
             />
           </div>
 
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
-              Title
-            </label>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Regional Sales Manager"
-              data-testid="rep-title-input"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+                Title
+              </label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Regional Sales Manager"
+                data-testid="rep-title-input"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+                Home Branch
+              </label>
+              <Input
+                value={branch}
+                onChange={(e) => setBranch(e.target.value)}
+                placeholder="e.g. Baton Rouge"
+                data-testid="rep-branch-input"
+              />
+            </div>
           </div>
 
           <div>

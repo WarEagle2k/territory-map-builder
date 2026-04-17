@@ -385,7 +385,9 @@ export async function exportTerritoryPDF(
 
   // === PAGE 2: Rep directory with full contact details ===
   // Only add if any rep has something to show beyond name
-  const hasDetails = territories.some((t) => t.title || t.phone || t.email);
+  const hasDetails = territories.some(
+    (t) => t.title || t.branch || t.phone || t.email
+  );
   if (hasDetails) {
     pdf.addPage();
     drawHeader("Sales Representatives");
@@ -436,13 +438,14 @@ export async function exportTerritoryPDF(
       pdf.setFontSize(12);
       pdf.text(fit(t.name, textMaxW), textX, cardY + 5);
 
-      // Title (if present)
+      // Title · Branch (both italic, gray — combine to save vertical space)
       let lineY = cardY + 9;
-      if (t.title) {
+      const subtitleParts = [t.title, t.branch].filter(Boolean).join("  ·  ");
+      if (subtitleParts) {
         pdf.setFont("helvetica", "italic");
         pdf.setFontSize(9);
         pdf.setTextColor(100, 100, 100);
-        pdf.text(fit(t.title, textMaxW), textX, lineY);
+        pdf.text(fit(subtitleParts, textMaxW), textX, lineY);
         lineY += 4;
       }
 

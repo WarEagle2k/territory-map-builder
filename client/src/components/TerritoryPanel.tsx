@@ -17,6 +17,7 @@ import {
   Info,
   Phone,
   Mail,
+  Building2,
 } from "lucide-react";
 import type { ClientTerritory } from "@/pages/home";
 
@@ -370,9 +371,9 @@ export default function TerritoryPanel({
                   />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{t.name}</div>
-                    {t.title && (
+                    {(t.title || t.branch) && (
                       <div className="text-[10px] text-muted-foreground truncate">
-                        {t.title}
+                        {[t.title, t.branch].filter(Boolean).join(" · ")}
                       </div>
                     )}
                   </div>
@@ -437,8 +438,14 @@ export default function TerritoryPanel({
                 {isExpanded && (
                   <div className="mt-3 pl-6 space-y-3">
                     {/* Contact info */}
-                    {(t.phone || t.email) && (
+                    {(t.branch || t.phone || t.email) && (
                       <div className="space-y-1">
+                        {t.branch && (
+                          <div className="flex items-center gap-2 text-xs text-foreground">
+                            <Building2 className="w-3 h-3 flex-shrink-0 text-muted-foreground" />
+                            <span className="truncate">{t.branch}</span>
+                          </div>
+                        )}
                         {t.phone && (
                           <a
                             href={`tel:${t.phone}`}
