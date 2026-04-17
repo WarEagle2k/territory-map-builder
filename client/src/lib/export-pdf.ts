@@ -67,8 +67,9 @@ async function svgToImage(
         found = true;
       });
       if (found) {
-        // ~15% padding around the focus area for breathing room
-        const fpad = Math.max(bMaxX - bMinX, bMaxY - bMinY) * 0.15;
+        // Tight focus — just a sliver of padding so territories aren't flush
+        // against the map edges. Keeps the zoom aggressive.
+        const fpad = Math.max(bMaxX - bMinX, bMaxY - bMinY) * 0.03;
         focusBbox = {
           x: bMinX - fpad,
           y: bMinY - fpad,
@@ -278,12 +279,19 @@ export async function exportTerritoryPDF(
     const mapAreaY = mapTop;
 
     const box = focusBbox ?? fullBbox;
-    // Pick a scale so the focus box fits in the mapArea (fit, not fill, so
-    // neither dimension overflows the map rectangle before clipping).
-    const scale = Math.min(
+    // Fit the focus box into the map area, then push a little further into
+    // fill territory. Pure fit leaves whitespace when focus aspect ≠ map
+    // aspect; pure fill (max) clips territories. 70-30 weighted blend feels
+    // like "clearly zoomed in" without cropping assigned counties.
+    const fitScale = Math.min(
       mapAreaWidth / box.width,
       mapAreaHeight / box.height
     );
+    const fillScale = Math.max(
+      mapAreaWidth / box.width,
+      mapAreaHeight / box.height
+    );
+    const scale = fitScale * 0.7 + fillScale * 0.3;
 
     // Full rendered image size on the PDF
     const imgW = fullBbox.width * scale;
