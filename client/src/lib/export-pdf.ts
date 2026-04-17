@@ -291,7 +291,7 @@ export async function exportTerritoryPDF(
       mapAreaWidth / box.width,
       mapAreaHeight / box.height
     );
-    const scale = fitScale * 0.7 + fillScale * 0.3;
+    const scale = fitScale * 0.85 + fillScale * 0.15;
 
     // Full rendered image size on the PDF
     const imgW = fullBbox.width * scale;
