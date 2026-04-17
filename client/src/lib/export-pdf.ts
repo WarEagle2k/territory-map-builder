@@ -239,6 +239,20 @@ export async function exportTerritoryPDF(
     return out + "...";
   };
 
+  // Helper: clean + normalize a phone number for display.
+  // Strips weird characters and re-formats common US shapes as (XXX) XXX-XXXX.
+  // Falls back to the trimmed input if the digit count doesn't look US.
+  const formatPhone = (raw: string): string => {
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    if (digits.length === 11 && digits[0] === "1") {
+      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+    return raw.trim();
+  };
+
   // === PAGE 1: Map + compact legend ===
   drawHeader("Territory Map");
 
@@ -427,7 +441,7 @@ export async function exportTerritoryPDF(
         pdf.text("Phone:", textX, lineY);
         pdf.setFont("helvetica", "normal");
         pdf.setTextColor(30, 30, 30);
-        pdf.text(fit(t.phone, textMaxW - 15), textX + 13, lineY);
+        pdf.text(fit(formatPhone(t.phone), textMaxW - 15), textX + 13, lineY);
         lineY += 4;
       }
 
