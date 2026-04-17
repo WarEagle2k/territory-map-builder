@@ -30,6 +30,8 @@ interface TerritoryMapProps {
   onCountiesDrag: (fipsList: string[]) => void;
   highlightTerritoryId: number | null;
   editingTerritoryId: number | null;
+  /** Fill opacity for assigned counties (0-1). Temporary knob for tuning. */
+  territoryOpacity?: number;
 }
 
 // Only 2-digit state FIPS codes are present in our dataset; keep this table
@@ -54,6 +56,7 @@ export default function TerritoryMap({
   onCountiesDrag,
   highlightTerritoryId,
   editingTerritoryId,
+  territoryOpacity = 0.5,
 }: TerritoryMapProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -419,9 +422,9 @@ export default function TerritoryMap({
       })
       .attr("opacity", function () {
         const fips = d3.select(this).attr("data-fips");
-        if (selectedCounties.has(fips)) return 0.6;
+        if (selectedCounties.has(fips)) return Math.min(territoryOpacity + 0.1, 1);
         const territory = ctMap.get(fips);
-        return territory ? 0.75 : 1;
+        return territory ? territoryOpacity : 1;
       });
   }, [
     geometryReady,
@@ -430,6 +433,7 @@ export default function TerritoryMap({
     selectedColor,
     countyToTerritory,
     highlightTerritoryId,
+    territoryOpacity,
   ]);
 
   return (

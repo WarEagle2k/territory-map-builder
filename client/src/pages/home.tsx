@@ -2,9 +2,8 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import TerritoryMap from "@/components/TerritoryMap";
 import TerritoryPanel from "@/components/TerritoryPanel";
 import MapLegend from "@/components/MapLegend";
-import { Map, PanelLeftClose, PanelLeft, Download, Upload, FileDown, Trash2 } from "lucide-react";
+import { PanelLeftClose, PanelLeft, Download, Upload, FileDown, Trash2 } from "lucide-react";
 import { exportTerritoryPDF } from "@/lib/export-pdf";
-import { Button } from "@/components/ui/button";
 import { TERRITORY_COLORS } from "@/lib/territory-colors";
 import {
   loadTerritories,
@@ -27,15 +26,65 @@ interface CountyInfo {
   state: string;
 }
 
-// Derive next ID from an array of territories so imports/restores can't clash
 function nextIdFrom(territories: { id: number }[]): number {
   return territories.length === 0
     ? 1
     : Math.max(...territories.map((t) => t.id)) + 1;
 }
 
+// Compact icon button used only in the branded header (white text on teal bg)
+// Shows a styled tooltip on hover/focus.
+function HeaderButton({
+  onClick,
+  title,
+  testId,
+  destructive,
+  children,
+}: {
+  onClick: () => void;
+  title: string;
+  testId?: string;
+  destructive?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative group">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={title}
+        data-testid={testId}
+        className={`inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors
+          ${destructive
+            ? "text-white/85 hover:bg-red-500/80 hover:text-white"
+            : "text-white/85 hover:bg-white/15 hover:text-white"}
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand-gold))]`}
+      >
+        {children}
+      </button>
+      {/* Tooltip */}
+      <div
+        role="tooltip"
+        className="pointer-events-none absolute top-full right-0 mt-2 z-50
+                   whitespace-nowrap rounded-md bg-slate-900 px-2 py-1
+                   text-[11px] font-medium text-white shadow-lg
+                   opacity-0 scale-95 translate-y-0.5
+                   transition-all duration-150
+                   group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0
+                   group-focus-within:opacity-100 group-focus-within:scale-100 group-focus-within:translate-y-0"
+      >
+        {title}
+        {/* Little arrow pointing up at the button */}
+        <span
+          aria-hidden
+          className="absolute -top-1 right-3 w-2 h-2 rotate-45 bg-slate-900"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
-  // Load once on mount from localStorage, fall back to empty / default palette
   const [territories, setTerritories] = useState<ClientTerritory[]>(
     () => loadTerritories() ?? []
   );
@@ -55,6 +104,8 @@ export default function Home() {
   const [selectedColor, setSelectedColor] = useState(colors[0]?.value ?? "#3b82f6");
   const [editingTerritoryId, setEditingTerritoryId] = useState<number | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  // TEMPORARY opacity tuning slider — remove once we settle on a value
+  const [territoryOpacity, setTerritoryOpacity] = useState(0.5);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Persistence ---
@@ -66,14 +117,12 @@ export default function Home() {
     saveColors(colors);
   }, [colors]);
 
-  // Clear import error after a few seconds
   useEffect(() => {
     if (!importError) return;
     const id = setTimeout(() => setImportError(null), 5000);
     return () => clearTimeout(id);
   }, [importError]);
 
-  // Load county names
   useEffect(() => {
     fetch("./county-names.json")
       .then((r) => r.json())
@@ -93,7 +142,6 @@ export default function Home() {
   const handleRemoveColor = useCallback((value: string) => {
     setColors((prev) => {
       const next = prev.filter((c) => c.value !== value);
-      // If the removed color was selected, switch to first remaining
       if (selectedColor === value && next.length > 0) {
         setSelectedColor(next[0].value);
       }
@@ -106,9 +154,7 @@ export default function Home() {
     const set = new Set<string>();
     for (const t of territories) {
       if (t.id === editingTerritoryId) continue;
-      for (const fips of t.countyFips) {
-        set.add(fips);
-      }
+      for (const fips of t.countyFips) set.add(fips);
     }
     return set;
   }, [territories, editingTerritoryId]);
@@ -150,7 +196,6 @@ export default function Home() {
     setSelectedCounties(new Set());
   }, []);
 
-  // --- Territory CRUD ---
   const handleCreateTerritory = useCallback(
     (name: string, color: string, counties: string[]) => {
       setTerritories((prev) => {
@@ -262,8 +307,6 @@ export default function Home() {
             );
             return;
           }
-
-          // Renumber IDs from 1 so imports don't clash with existing
           let counter = 1;
           const imported: ClientTerritory[] = result.data.map((item) => ({
             id: counter++,
@@ -289,71 +332,85 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="h-12 border-b border-border flex items-center px-4 gap-3 flex-shrink-0 bg-card">
-        <Map className="w-5 h-5 text-primary" />
-        <h1 className="text-sm font-semibold" data-testid="app-title">
+      {/* Branded header — gold accent strip over the deep teal bar */}
+      <div
+        className="h-1 flex-shrink-0"
+        style={{ backgroundColor: "hsl(var(--brand-gold))" }}
+      />
+      <header
+        className="h-14 flex items-center px-5 gap-4 flex-shrink-0 text-white shadow-md relative z-10"
+        style={{ backgroundColor: "hsl(var(--brand-teal))" }}
+        data-testid="app-header"
+      >
+        <img
+          src="./csi-logo.png"
+          alt="Connector Specialists Incorporated"
+          className="h-8 w-auto"
+        />
+        <div className="w-px h-6 bg-white/20" aria-hidden />
+        <h1
+          className="text-sm font-medium tracking-wide uppercase"
+          data-testid="app-title"
+        >
           Territory Map Builder
         </h1>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1">
           {hoveredCounty && (
             <div
-              className="text-xs text-muted-foreground hidden sm:block"
+              className="text-xs text-white/80 hidden sm:block mr-3"
               data-testid="hovered-county-info"
             >
-              <span className="font-medium text-foreground">
+              <span className="font-semibold text-white">
                 {hoveredCounty.name}
               </span>
-              , {hoveredCounty.state}
+              <span className="text-white/60">, {hoveredCounty.state}</span>
               {assignedCounties.has(hoveredCounty.fips) && (
-                <span className="ml-1 text-primary">(assigned)</span>
+                <span
+                  className="ml-1.5 font-medium"
+                  style={{ color: "hsl(var(--brand-gold))" }}
+                >
+                  · assigned
+                </span>
               )}
             </div>
           )}
 
           {territories.length > 0 && (
             <>
-              <Button
-                variant="ghost"
-                size="sm"
+              <HeaderButton
                 onClick={handleExportPDF}
-                data-testid="export-pdf-btn"
                 title="Export as PDF"
+                testId="export-pdf-btn"
               >
                 <FileDown className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
+              </HeaderButton>
+              <HeaderButton
                 onClick={handleExport}
-                data-testid="export-btn"
                 title="Export as JSON"
+                testId="export-btn"
               >
                 <Download className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
+              </HeaderButton>
+              <HeaderButton
                 onClick={handleClearAllTerritories}
-                data-testid="clear-all-btn"
                 title="Clear all territories"
-                className="text-destructive hover:text-destructive"
+                testId="clear-all-btn"
+                destructive
               >
                 <Trash2 className="w-4 h-4" />
-              </Button>
+              </HeaderButton>
+              <div className="w-px h-5 bg-white/20 mx-1" aria-hidden />
             </>
           )}
 
-          <Button
-            variant="ghost"
-            size="sm"
+          <HeaderButton
             onClick={() => fileInputRef.current?.click()}
-            data-testid="import-btn"
             title="Import territories"
+            testId="import-btn"
           >
             <Upload className="w-4 h-4" />
-          </Button>
+          </HeaderButton>
           <input
             ref={fileInputRef}
             type="file"
@@ -362,18 +419,17 @@ export default function Home() {
             onChange={handleImport}
           />
 
-          <Button
-            variant="ghost"
-            size="sm"
+          <HeaderButton
             onClick={() => setPanelOpen(!panelOpen)}
-            data-testid="toggle-panel-btn"
+            title={panelOpen ? "Hide panel" : "Show panel"}
+            testId="toggle-panel-btn"
           >
             {panelOpen ? (
               <PanelLeftClose className="w-4 h-4" />
             ) : (
               <PanelLeft className="w-4 h-4" />
             )}
-          </Button>
+          </HeaderButton>
         </div>
       </header>
 
@@ -400,15 +456,39 @@ export default function Home() {
             onCountiesDrag={handleCountiesDrag}
             highlightTerritoryId={highlightTerritoryId}
             editingTerritoryId={editingTerritoryId}
+            territoryOpacity={territoryOpacity}
           />
+
+          {/* TEMP: opacity tuner — remove once we pick a final value */}
+          <div
+            className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm border border-border rounded-lg shadow-md px-3 py-2 flex items-center gap-3 z-20"
+            data-testid="opacity-tuner"
+          >
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Opacity
+            </label>
+            <input
+              type="range"
+              min="0.1"
+              max="1"
+              step="0.05"
+              value={territoryOpacity}
+              onChange={(e) => setTerritoryOpacity(parseFloat(e.target.value))}
+              className="w-40 accent-[hsl(var(--brand-teal))]"
+            />
+            <span className="text-xs font-mono tabular-nums text-foreground w-10 text-right">
+              {territoryOpacity.toFixed(2)}
+            </span>
+          </div>
           <MapLegend
             territories={territories}
             onHighlight={setHighlightTerritoryId}
+            swatchOpacity={territoryOpacity}
           />
         </div>
 
         {panelOpen && (
-          <div className="w-80 border-l border-border bg-card flex-shrink-0 overflow-hidden">
+          <aside className="w-80 border-l border-border bg-sidebar flex-shrink-0 overflow-hidden">
             <TerritoryPanel
               territories={territories}
               selectedCounties={selectedCounties}
@@ -427,8 +507,9 @@ export default function Home() {
               onCancelEditCounties={handleCancelEditCounties}
               editingTerritoryId={editingTerritoryId}
               countyNames={countyNames}
+              swatchOpacity={territoryOpacity}
             />
-          </div>
+          </aside>
         )}
       </div>
     </div>

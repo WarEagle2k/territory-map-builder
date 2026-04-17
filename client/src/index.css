@@ -2,8 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE */
+/* LIGHT MODE — CSI brand palette */
 :root {
+  /* CSI brand colors surfaced as utility vars */
+  --brand-teal: 201 42% 25%;    /* #264b5d */
+  --brand-teal-dark: 201 45% 18%;
+  --brand-gold: 49 98% 51%;     /* #fdcd07 */
+
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
   --opaque-button-border-intensity: -8;
@@ -12,49 +17,49 @@
   --background: 210 20% 98%;
   --foreground: 215 25% 15%;
   --border: 210 12% 86%;
-  --card: 210 15% 97%;
+  --card: 0 0% 100%;
   --card-foreground: 215 25% 15%;
   --card-border: 210 12% 90%;
-  --sidebar: 215 18% 95%;
+  --sidebar: 210 25% 97%;
   --sidebar-foreground: 215 25% 15%;
   --sidebar-border: 210 12% 88%;
-  --sidebar-primary: 205 75% 40%;
+  --sidebar-primary: var(--brand-teal);
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 210 14% 89%;
+  --sidebar-accent: 201 30% 92%;
   --sidebar-accent-foreground: 215 25% 15%;
-  --sidebar-ring: 205 75% 40%;
-  --popover: 210 15% 96%;
+  --sidebar-ring: var(--brand-teal);
+  --popover: 0 0% 100%;
   --popover-foreground: 215 25% 15%;
   --popover-border: 210 12% 86%;
-  --primary: 205 75% 40%;
+  --primary: var(--brand-teal);
   --primary-foreground: 0 0% 100%;
   --secondary: 210 12% 91%;
   --secondary-foreground: 215 25% 15%;
   --muted: 210 10% 92%;
   --muted-foreground: 215 10% 45%;
-  --accent: 210 14% 90%;
+  --accent: 201 30% 92%;
   --accent-foreground: 215 25% 15%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
   --input: 210 10% 75%;
-  --ring: 205 75% 40%;
+  --ring: var(--brand-teal);
   --chart-1: 221 83% 45%;
   --chart-2: 262 83% 48%;
   --chart-3: 173 58% 39%;
   --chart-4: 43 74% 49%;
   --chart-5: 27 87% 55%;
-  --font-sans: Open Sans, sans-serif;
+  --font-sans: Inter, system-ui, -apple-system, sans-serif;
   --font-serif: Georgia, serif;
-  --font-mono: Menlo, monospace;
+  --font-mono: "Geist Mono", Menlo, monospace;
   --radius: .5rem;
-  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.00), 0px 1px 2px -1px hsl(0 0% 0% / 0.00);
-  --shadow: 0px 2px 0px 0px hsl(0 0% 0% / 0.00), 0px 1px 2px -1px hsl(0 0% 0% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(0 0% 0% / 0.00), 0px 2px 4px -1px hsl(0 0% 0% / 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0.00), 0px 4px 6px -1px hsl(0 0% 0% / 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.00), 0px 8px 10px -1px hsl(0 0% 0% / 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
+  --shadow-2xs: 0 1px 2px 0 hsl(215 25% 15% / 0.04);
+  --shadow-xs: 0 1px 2px 0 hsl(215 25% 15% / 0.05);
+  --shadow-sm: 0 1px 2px 0 hsl(215 25% 15% / 0.06), 0 1px 3px 0 hsl(215 25% 15% / 0.04);
+  --shadow: 0 1px 3px 0 hsl(215 25% 15% / 0.08), 0 1px 2px -1px hsl(215 25% 15% / 0.06);
+  --shadow-md: 0 4px 6px -1px hsl(215 25% 15% / 0.08), 0 2px 4px -2px hsl(215 25% 15% / 0.06);
+  --shadow-lg: 0 10px 15px -3px hsl(215 25% 15% / 0.08), 0 4px 6px -2px hsl(215 25% 15% / 0.05);
+  --shadow-xl: 0 20px 25px -5px hsl(215 25% 15% / 0.10), 0 10px 10px -5px hsl(215 25% 15% / 0.04);
+  --shadow-2xl: 0 25px 50px -12px hsl(215 25% 15% / 0.20);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
