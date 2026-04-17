@@ -247,13 +247,13 @@ export async function exportTerritoryPDF(
   const footerHeight = 8;
   const mapAreaWidth = pageW - margin * 2;
 
-  // Compact key: just swatch + name. Contact info moves to page 2.
+  // Compact key: just swatch + name. No header bar — the rows of colored
+  // swatches under the map are obviously a legend.
   const keyCols = Math.min(territories.length || 1, 4);
   const keyRows = Math.max(1, Math.ceil(territories.length / keyCols));
-  const keyHeaderHeight = 7;       // teal bar
-  const keyRowHeight = 5.5;        // compact row
-  const keyPadding = 5;
-  const keyHeight = keyHeaderHeight + keyPadding + keyRows * keyRowHeight;
+  const keyRowHeight = 5.5;
+  const keyPadding = 3;
+  const keyHeight = keyPadding + keyRows * keyRowHeight;
 
   const mapAreaHeight = pageH - mapTop - keyHeight - footerHeight - 4;
 
@@ -328,18 +328,9 @@ export async function exportTerritoryPDF(
     });
   }
 
-  // --- COMPACT KEY (horizontal grid below map) ---
-  const keyTop = mapBottomY + 4;
-
-  pdf.setFillColor(...deepTeal);
-  pdf.roundedRect(margin, keyTop, pageW - margin * 2, 7, 2, 2, "F");
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(9);
-  pdf.setFont("helvetica", "bold");
-  pdf.text("TERRITORY KEY", pageW / 2, keyTop + 4.8, { align: "center" });
-
+  // --- COMPACT KEY (just the swatches + names below the map) ---
   const colWidth = (pageW - margin * 2) / keyCols;
-  const entryTop = keyTop + keyHeaderHeight + 3;
+  const entryTop = mapBottomY + 5;
 
   territories.forEach((t, i) => {
     const col = i % keyCols;
