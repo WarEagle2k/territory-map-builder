@@ -22,6 +22,30 @@ interface RepDetailsDialogProps {
   onClose: () => void;
 }
 
+// --- Validation helpers ---
+// Both fields are optional; empty = valid. If entered, must pass the check.
+
+function validatePhone(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  // Strip everything that isn't a digit
+  const digits = trimmed.replace(/\D/g, "");
+  // US: 10 digits, or 11 starting with 1 (country code)
+  if (digits.length === 10) return null;
+  if (digits.length === 11 && digits.startsWith("1")) return null;
+  return "Enter a 10-digit US phone number (e.g. 555-123-4567).";
+}
+
+function validateEmail(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  // Simple, practical email regex — not RFC-5322 strict, but catches typos.
+  // Must have: something @ something . something
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (re.test(trimmed)) return null;
+  return "Enter a valid email address (e.g. rep@company.com).";
+}
+
 /**
  * Simple modal for editing a rep's details (name, title, phone, email).
  * Closes on Escape or backdrop click.
@@ -55,9 +79,13 @@ export default function RepDetailsDialog({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const phoneError = validatePhone(phone);
+  const emailError = validateEmail(email);
+  const canSave = !!name.trim() && !phoneError && !emailError;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!canSave) return;
     onSave({
       name: name.trim(),
       title: title.trim() || undefined,
@@ -180,7 +208,19 @@ export default function RepDetailsDialog({
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="(555) 123-4567"
                 data-testid="rep-phone-input"
+                aria-invalid={!!phoneError}
+                aria-describedby={phoneError ? "rep-phone-error" : undefined}
+                className={phoneError ? "border-destructive focus-visible:ring-destructive" : ""}
               />
+              {phoneError && (
+                <p
+                  id="rep-phone-error"
+                  className="mt-1 text-[11px] text-destructive"
+                  data-testid="rep-phone-error"
+                >
+                  {phoneError}
+                </p>
+              )}
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
@@ -192,7 +232,19 @@ export default function RepDetailsDialog({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="rep@company.com"
                 data-testid="rep-email-input"
+                aria-invalid={!!emailError}
+                aria-describedby={emailError ? "rep-email-error" : undefined}
+                className={emailError ? "border-destructive focus-visible:ring-destructive" : ""}
               />
+              {emailError && (
+                <p
+                  id="rep-email-error"
+                  className="mt-1 text-[11px] text-destructive"
+                  data-testid="rep-email-error"
+                >
+                  {emailError}
+                </p>
+              )}
             </div>
           </div>
 
@@ -207,7 +259,7 @@ export default function RepDetailsDialog({
             </Button>
             <Button
               type="submit"
-              disabled={!name.trim()}
+              disabled={!canSave}
               data-testid="rep-save-btn"
             >
               <Save className="w-4 h-4 mr-2" />
