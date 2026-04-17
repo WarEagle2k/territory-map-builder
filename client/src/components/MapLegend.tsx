@@ -3,6 +3,7 @@ import type { ClientTerritory } from "@/pages/home";
 interface MapLegendProps {
   territories: ClientTerritory[];
   onHighlight: (id: number | null) => void;
+  onOpenDetails?: (id: number) => void;
   /** Matches the territory fill opacity on the map for visual consistency */
   swatchOpacity?: number;
 }
@@ -10,6 +11,7 @@ interface MapLegendProps {
 export default function MapLegend({
   territories,
   onHighlight,
+  onOpenDetails,
   swatchOpacity = 1,
 }: MapLegendProps) {
   if (territories.length === 0) return null;
@@ -31,9 +33,11 @@ export default function MapLegend({
         {territories.map((t) => (
           <div
             key={t.id}
-            className="flex items-center gap-2 cursor-default rounded px-1 py-0.5 -mx-1 hover:bg-accent/50 transition-colors"
+            className="flex items-center gap-2 cursor-pointer rounded px-1 py-0.5 -mx-1 hover:bg-accent/50 transition-colors select-none"
             onMouseEnter={() => onHighlight(t.id)}
             onMouseLeave={() => onHighlight(null)}
+            onDoubleClick={() => onOpenDetails?.(t.id)}
+            title="Double-click to edit rep details"
             data-testid={`legend-item-${t.id}`}
           >
             <div

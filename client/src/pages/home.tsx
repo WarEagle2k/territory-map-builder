@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import TerritoryMap from "@/components/TerritoryMap";
 import TerritoryPanel from "@/components/TerritoryPanel";
 import MapLegend from "@/components/MapLegend";
+import RepDetailsDialog from "@/components/RepDetailsDialog";
 import { PanelLeftClose, PanelLeft, Download, Upload, FileDown, Trash2 } from "lucide-react";
 import { exportTerritoryPDF } from "@/lib/export-pdf";
 import { TERRITORY_COLORS } from "@/lib/territory-colors";
@@ -107,6 +108,7 @@ export default function Home() {
   const [selectedColor, setSelectedColor] = useState(colors[0]?.value ?? "#3b82f6");
   const [editingTerritoryId, setEditingTerritoryId] = useState<number | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [detailsId, setDetailsId] = useState<number | null>(null);
   // TEMPORARY opacity tuning slider — remove once we settle on a value
   const [territoryOpacity, setTerritoryOpacity] = useState(0.5);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -497,6 +499,7 @@ export default function Home() {
           <MapLegend
             territories={territories}
             onHighlight={setHighlightTerritoryId}
+            onOpenDetails={setDetailsId}
             swatchOpacity={territoryOpacity}
           />
         </div>
@@ -519,6 +522,7 @@ export default function Home() {
               onEditTerritoryCounties={handleEditTerritoryCounties}
               onSaveTerritoryCounties={handleSaveTerritoryCounties}
               onCancelEditCounties={handleCancelEditCounties}
+              onOpenDetails={setDetailsId}
               editingTerritoryId={editingTerritoryId}
               countyNames={countyNames}
               swatchOpacity={territoryOpacity}
@@ -526,6 +530,20 @@ export default function Home() {
           </aside>
         )}
       </div>
+
+      {/* Rep details dialog — opened from the territory card's Info button
+          or by double-clicking a name in the map legend */}
+      {detailsId != null && (() => {
+        const territory = territories.find((t) => t.id === detailsId);
+        if (!territory) return null;
+        return (
+          <RepDetailsDialog
+            territory={territory}
+            onSave={(updates) => handleUpdateTerritory(territory.id, updates)}
+            onClose={() => setDetailsId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
