@@ -167,12 +167,15 @@ export async function exportTerritoryPDF(
   const footerHeight = 8;
   const mapAreaWidth = pageW - margin * 2;
 
-  // Calculate how tall the key will be based on territory count
+  // Calculate how tall the key will be based on territory count + whether
+  // any rep has contact info (phone or email). Contact info adds vertical
+  // space per entry so names aren't crowded.
+  const hasContactInfo = territories.some((t) => t.phone || t.email);
   const keyCols = Math.min(territories.length || 1, 4);
   const keyRows = Math.max(1, Math.ceil(territories.length / keyCols));
-  const keyHeaderHeight = 7; // teal bar
-  const keyRowHeight = 7;    // each row of entries
-  const keyPadding = 6;      // gap above entries + space below
+  const keyHeaderHeight = 7;                     // teal bar
+  const keyRowHeight = hasContactInfo ? 13 : 7;  // each row of entries
+  const keyPadding = 6;                          // gap above entries + space below
   const keyHeight = keyHeaderHeight + keyPadding + keyRows * keyRowHeight;
 
   const mapAreaHeight = pageH - mapTop - keyHeight - footerHeight - 4; // 4mm gap between map and key
@@ -216,6 +219,16 @@ export async function exportTerritoryPDF(
   const colWidth = (pageW - margin * 2) / keyCols;
   const entryTop = keyTop + keyHeaderHeight + 3;
 
+  // Helper: truncate a string so it fits a given px width
+  const fit = (s: string, maxW: number): string => {
+    if (pdf.getTextWidth(s) <= maxW) return s;
+    let out = s;
+    while (out.length > 0 && pdf.getTextWidth(out + "...") > maxW) {
+      out = out.slice(0, -1);
+    }
+    return out + "...";
+  };
+
   territories.forEach((t, i) => {
     const col = i % keyCols;
     const row = Math.floor(i / keyCols);
@@ -230,19 +243,27 @@ export async function exportTerritoryPDF(
     pdf.setFillColor(r, g, b);
     pdf.roundedRect(x, y, 4, 4, 0.8, 0.8, "F");
 
-    // Territory name
+    const textX = x + 7;
+    const textMaxW = colWidth - 9;
+
+    // Territory name (bold)
     pdf.setTextColor(30, 30, 30);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(11);
-    // Truncate long names to fit column
-    let name = t.name;
-    if (pdf.getTextWidth(name) > colWidth - 14) {
-      while (pdf.getTextWidth(name + "...") > colWidth - 14 && name.length > 0) {
-        name = name.slice(0, -1);
+    pdf.text(fit(t.name, textMaxW), textX, y + 3.5);
+
+    // Contact info — phone on one line, email on the next
+    if (hasContactInfo) {
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      pdf.setTextColor(100, 100, 100);
+      if (t.phone) {
+        pdf.text(fit(t.phone, textMaxW), textX, y + 7.5);
       }
-      name += "...";
+      if (t.email) {
+        pdf.text(fit(t.email, textMaxW), textX, y + 11);
+      }
     }
-    pdf.text(name, x + 7, y + 3.5);
   });
 
   // --- FOOTER ---
