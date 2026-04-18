@@ -120,7 +120,7 @@ async function svgToImage(
       // JPEG at 0.92 quality is ~85–90% smaller than PNG for a map like this
       // and visually indistinguishable from PNG for the level of detail we
       // have (thin borders, flat color fills, text labels). Crucially it
-      // keeps every county boundary, highway, and city label sharp.
+      // keeps every county boundary, interstate, and city label sharp.
       resolve({
         dataUrl: canvas.toDataURL("image/jpeg", 0.92),
         fullBbox,
