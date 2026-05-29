@@ -1,11 +1,7 @@
 import jsPDF, { GState } from "jspdf";
 import type { ClientTerritory } from "@/pages/home";
 import { TERRITORY_FILL_OPACITY } from "@/lib/territory-colors";
-
-interface CountyInfo {
-  name: string;
-  state: string;
-}
+import { normalizePhone } from "@/lib/validation";
 
 // Rect in SVG coordinates
 interface Rect {
@@ -156,8 +152,7 @@ async function loadImageAsDataUrl(src: string): Promise<string> {
 
 export async function exportTerritoryPDF(
   svgEl: SVGSVGElement,
-  territories: ClientTerritory[],
-  countyNames: Record<string, CountyInfo>
+  territories: ClientTerritory[]
 ) {
   // Brand colors
   const deepTeal = [38, 75, 93] as const; // #264b5d
@@ -243,20 +238,6 @@ export async function exportTerritoryPDF(
       out = out.slice(0, -1);
     }
     return out + "...";
-  };
-
-  // Helper: clean + normalize a phone number for display.
-  // Strips weird characters and re-formats common US shapes as (XXX) XXX-XXXX.
-  // Falls back to the trimmed input if the digit count doesn't look US.
-  const formatPhone = (raw: string): string => {
-    const digits = raw.replace(/\D/g, "");
-    if (digits.length === 10) {
-      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-    }
-    if (digits.length === 11 && digits[0] === "1") {
-      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-    }
-    return raw.trim();
   };
 
   // Graphics state that matches the on-screen territory opacity, so the key
@@ -479,7 +460,7 @@ export async function exportTerritoryPDF(
         pdf.text("Phone:", textX, lineY);
         pdf.setFont("helvetica", "normal");
         pdf.setTextColor(30, 30, 30);
-        pdf.text(fit(formatPhone(t.phone), textMaxW - 15), textX + 13, lineY);
+        pdf.text(fit(normalizePhone(t.phone), textMaxW - 15), textX + 13, lineY);
         lineY += 4;
       }
 
@@ -492,7 +473,6 @@ export async function exportTerritoryPDF(
         pdf.setFont("helvetica", "normal");
         pdf.setTextColor(30, 30, 30);
         pdf.text(fit(t.email, textMaxW - 13), textX + 11, lineY);
-        lineY += 4;
       }
 
       // Counties count (always shown, bottom-right of the card)

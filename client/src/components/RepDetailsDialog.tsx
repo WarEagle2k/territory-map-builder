@@ -3,6 +3,7 @@ import { X, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ClientTerritory } from "@/pages/home";
+import { validatePhone, normalizePhone, validateEmail } from "@/lib/validation";
 
 interface ColorOption {
   name: string;
@@ -20,45 +21,6 @@ interface RepDetailsDialogProps {
     >
   ) => void;
   onClose: () => void;
-}
-
-// --- Validation helpers ---
-// Both fields are optional; empty = valid. If entered, must pass the check.
-
-function validatePhone(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  // Strip everything that isn't a digit
-  const digits = trimmed.replace(/\D/g, "");
-  // US: 10 digits, or 11 starting with 1 (country code)
-  if (digits.length === 10) return null;
-  if (digits.length === 11 && digits.startsWith("1")) return null;
-  return "Enter a 10-digit US phone number (e.g. 555-123-4567).";
-}
-
-// Normalize whatever the user typed into a clean stored format.
-// 10-digit US number → "(XXX) XXX-XXXX"
-// 11-digit with leading 1 → "+1 (XXX) XXX-XXXX"
-// Anything else falls back to the trimmed input.
-function normalizePhone(value: string): string {
-  const digits = value.replace(/\D/g, "");
-  if (digits.length === 10) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
-  if (digits.length === 11 && digits[0] === "1") {
-    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-  }
-  return value.trim();
-}
-
-function validateEmail(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  // Simple, practical email regex — not RFC-5322 strict, but catches typos.
-  // Must have: something @ something . something
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (re.test(trimmed)) return null;
-  return "Enter a valid email address (e.g. rep@company.com).";
 }
 
 /**

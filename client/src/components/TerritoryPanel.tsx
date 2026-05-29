@@ -38,7 +38,6 @@ interface TerritoryPanelProps {
   onClearSelection: () => void;
   onHighlightTerritory: (id: number | null) => void;
   onCreateTerritory: (name: string, color: string, counties: string[]) => void;
-  onUpdateTerritory: (id: number, updates: Partial<Pick<ClientTerritory, "name" | "color">>) => void;
   onDeleteTerritory: (id: number) => void;
   onEditTerritoryCounties: (id: number) => void;
   onSaveTerritoryCounties: () => void;
@@ -59,7 +58,6 @@ export default function TerritoryPanel({
   onClearSelection,
   onHighlightTerritory,
   onCreateTerritory,
-  onUpdateTerritory,
   onDeleteTerritory,
   onEditTerritoryCounties,
   onSaveTerritoryCounties,
