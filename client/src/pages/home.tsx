@@ -373,6 +373,26 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col bg-background">
+      {/* Desktop-only: this is a mouse-driven county-painting tool. On small
+          screens show a notice instead of the cramped layout. */}
+      <div
+        className="md:hidden fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-background px-8 text-center"
+        data-testid="small-screen-notice"
+      >
+        <img
+          src="./csi-logo.png"
+          alt="Connector Specialists Incorporated"
+          className="h-10 w-auto"
+        />
+        <h1 className="text-base font-semibold text-foreground">
+          Territory Map Builder
+        </h1>
+        <p className="max-w-xs text-sm text-muted-foreground">
+          This tool is built for desktop. Please open it on a larger screen to
+          build and edit territory maps.
+        </p>
+      </div>
+
       {/* Branded header — gold accent strip over the deep teal bar */}
       <div
         className="h-1 flex-shrink-0"

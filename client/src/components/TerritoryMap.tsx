@@ -69,6 +69,7 @@ export default function TerritoryMap({
   const [countyNames, setCountyNames] = useState<Record<string, CountyInfo>>({});
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [geometryReady, setGeometryReady] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   // Drag painting state
   const isDraggingRef = useRef(false);
@@ -99,7 +100,7 @@ export default function TerritoryMap({
         setHighwayData(highways);
         setCities(citiesData?.cities ?? []);
       })
-      .catch(() => {});
+      .catch(() => setLoadError(true));
   }, []);
 
   // --- Responsive resize ---
@@ -473,20 +474,55 @@ export default function TerritoryMap({
         style={{ userSelect: "none" }}
         data-testid="territory-map-svg"
       />
-      <div className="absolute bottom-2 left-2 text-[10px] text-muted-foreground/60 pointer-events-none select-none">
-        Scroll to zoom · Shift+drag to pan · Click or drag to select counties
+      {/* Bottom captions — one flex bar so the hint and attribution never overlap */}
+      <div className="absolute bottom-2 inset-x-2 flex items-end justify-between gap-4 text-[10px] text-muted-foreground/60 select-none pointer-events-none">
+        <span className="truncate min-w-0">
+          Scroll to zoom · Shift+drag to pan · Click or drag to select counties
+        </span>
+        <span className="flex-shrink-0 pointer-events-auto">
+          Highways ©{" "}
+          <a
+            href="https://www.openstreetmap.org/copyright"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-muted-foreground"
+          >
+            OpenStreetMap contributors
+          </a>
+        </span>
       </div>
-      <div className="absolute bottom-2 right-2 text-[10px] text-muted-foreground/60 select-none">
-        Highways ©{" "}
-        <a
-          href="https://www.openstreetmap.org/copyright"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-muted-foreground"
+
+      {/* Loading overlay — covers the map until the geometry is built */}
+      {!geometryReady && !loadError && (
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background"
+          data-testid="map-loading"
         >
-          OpenStreetMap contributors
-        </a>
-      </div>
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted-foreground/25 border-t-[hsl(var(--brand-teal))]" />
+          <p className="text-xs text-muted-foreground">Loading map…</p>
+        </div>
+      )}
+
+      {/* Error overlay — shown if the map data fails to load */}
+      {loadError && (
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background px-6 text-center"
+          role="alert"
+          data-testid="map-error"
+        >
+          <p className="text-sm font-medium text-foreground">Couldn't load the map</p>
+          <p className="max-w-xs text-xs text-muted-foreground">
+            The map data didn't load. Check your connection and try again.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-1 text-xs font-medium text-[hsl(var(--brand-teal))] underline hover:no-underline"
+          >
+            Reload
+          </button>
+        </div>
+      )}
     </div>
   );
 }
