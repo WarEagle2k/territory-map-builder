@@ -1,18 +1,11 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import TerritoryMap from "@/components/TerritoryMap";
 import TerritoryPanel from "@/components/TerritoryPanel";
 import MapLegend from "@/components/MapLegend";
 import RepDetailsDialog from "@/components/RepDetailsDialog";
 import { PanelLeftClose, PanelLeft, Download, Upload, FileDown, Trash2 } from "lucide-react";
-import { TERRITORY_COLORS } from "@/lib/territory-colors";
-import {
-  loadTerritories,
-  saveTerritories,
-  loadColors,
-  saveColors,
-  importFileSchema,
-  type Territory as StoredTerritory,
-} from "@/lib/storage";
+import { importFileSchema } from "@/lib/storage";
+import { useTerritories } from "@/lib/use-territories";
 
 export interface ClientTerritory {
   id: number;
@@ -28,12 +21,6 @@ export interface ClientTerritory {
 interface CountyInfo {
   name: string;
   state: string;
-}
-
-function nextIdFrom(territories: { id: number }[]): number {
-  return territories.length === 0
-    ? 1
-    : Math.max(...territories.map((t) => t.id)) + 1;
 }
 
 // Compact icon button used only in the branded header (white text on teal bg)
@@ -89,14 +76,31 @@ function HeaderButton({
 }
 
 export default function Home() {
-  const [territories, setTerritories] = useState<ClientTerritory[]>(
-    () => loadTerritories() ?? []
-  );
-  const [colors, setColors] = useState(() => loadColors() ?? TERRITORY_COLORS);
+  // Territory data, selection, editing, and persistence all live in the hook.
+  const {
+    territories,
+    colors,
+    selectedCounties,
+    selectedColor,
+    editingTerritoryId,
+    assignedCounties,
+    setSelectedColor,
+    addColor,
+    removeColor,
+    selectCounty,
+    dragSelectCounties,
+    clearSelection,
+    createTerritory,
+    updateTerritory,
+    deleteTerritory,
+    startEditingCounties,
+    saveEditingCounties,
+    cancelEditingCounties,
+    clearAll,
+    replaceAll,
+  } = useTerritories();
 
-  const nextIdRef = useRef(nextIdFrom(territories));
-
-  const [selectedCounties, setSelectedCounties] = useState<Set<string>>(new Set());
+  // View-only state.
   const [hoveredCounty, setHoveredCounty] = useState<{
     fips: string;
     name: string;
@@ -105,38 +109,10 @@ export default function Home() {
   const [highlightTerritoryId, setHighlightTerritoryId] = useState<number | null>(null);
   const [countyNames, setCountyNames] = useState<Record<string, CountyInfo>>({});
   const [panelOpen, setPanelOpen] = useState(true);
-  const [selectedColor, setSelectedColor] = useState(colors[0]?.value ?? "#3b82f6");
-  const [editingTerritoryId, setEditingTerritoryId] = useState<number | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [detailsId, setDetailsId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // --- Persistence ---
-  //
-  // Mount-guard is CRITICAL: if loadTerritories()/loadColors() ever returns
-  // null (schema validation failure, corrupted JSON, quota issues, etc.),
-  // useState falls back to [] / default colors. Without the guard, the effect
-  // would fire on the initial mount and immediately write that empty fallback
-  // over whatever was in localStorage — silently wiping the user's real data.
-  // Skipping the first run means we only persist state that the user has
-  // actively changed.
-  const didMountTerritories = useRef(false);
-  useEffect(() => {
-    if (!didMountTerritories.current) {
-      didMountTerritories.current = true;
-      return;
-    }
-    saveTerritories(territories as StoredTerritory[]);
-  }, [territories]);
-
-  const didMountColors = useRef(false);
-  useEffect(() => {
-    if (!didMountColors.current) {
-      didMountColors.current = true;
-      return;
-    }
-    saveColors(colors);
-  }, [colors]);
+  const mapSvgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     if (!importError) return;
@@ -151,48 +127,6 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  // --- Color management ---
-  const handleAddColor = useCallback((hex: string) => {
-    const normalized = hex.startsWith("#") ? hex.toLowerCase() : `#${hex.toLowerCase()}`;
-    setColors((prev) => {
-      if (prev.some((c) => c.value.toLowerCase() === normalized)) return prev;
-      return [...prev, { name: normalized.toUpperCase(), value: normalized }];
-    });
-  }, []);
-
-  const handleRemoveColor = useCallback((value: string) => {
-    setColors((prev) => {
-      const next = prev.filter((c) => c.value !== value);
-      if (selectedColor === value && next.length > 0) {
-        setSelectedColor(next[0].value);
-      }
-      return next;
-    });
-  }, [selectedColor]);
-
-  // --- County selection ---
-  const assignedCounties = useMemo(() => {
-    const set = new Set<string>();
-    for (const t of territories) {
-      if (t.id === editingTerritoryId) continue;
-      for (const fips of t.countyFips) set.add(fips);
-    }
-    return set;
-  }, [territories, editingTerritoryId]);
-
-  const handleCountyClick = useCallback(
-    (fips: string) => {
-      if (assignedCounties.has(fips)) return;
-      setSelectedCounties((prev) => {
-        const next = new Set(prev);
-        if (next.has(fips)) next.delete(fips);
-        else next.add(fips);
-        return next;
-      });
-    },
-    [assignedCounties]
-  );
-
   const handleCountyHover = useCallback(
     (info: { fips: string; name: string; state: string } | null) => {
       setHoveredCounty(info);
@@ -200,104 +134,9 @@ export default function Home() {
     []
   );
 
-  const handleCountiesDrag = useCallback(
-    (fipsList: string[]) => {
-      setSelectedCounties((prev) => {
-        const next = new Set(prev);
-        for (const fips of fipsList) {
-          if (!assignedCounties.has(fips)) next.add(fips);
-        }
-        return next;
-      });
-    },
-    [assignedCounties]
-  );
-
-  const handleClearSelection = useCallback(() => {
-    setSelectedCounties(new Set());
-  }, []);
-
-  const handleCreateTerritory = useCallback(
-    (name: string, color: string, counties: string[]) => {
-      setTerritories((prev) => {
-        const id = nextIdRef.current++;
-        return [...prev, { id, name, color, countyFips: counties }];
-      });
-      setSelectedCounties(new Set());
-    },
-    []
-  );
-
-  const handleUpdateTerritory = useCallback(
-    (
-      id: number,
-      updates: Partial<
-        Pick<ClientTerritory, "name" | "color" | "title" | "branch" | "phone" | "email">
-      >
-    ) => {
-      setTerritories((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
-      );
-    },
-    []
-  );
-
-  const handleDeleteTerritory = useCallback((id: number) => {
-    const target = territories.find((t) => t.id === id);
-    const confirmed = window.confirm(
-      `Delete territory "${target?.name ?? ""}"? This cannot be undone.`
-    );
-    if (!confirmed) return;
-    setTerritories((prev) => prev.filter((t) => t.id !== id));
-    if (editingTerritoryId === id) {
-      setEditingTerritoryId(null);
-      setSelectedCounties(new Set());
-    }
-  }, [territories, editingTerritoryId]);
-
-  const handleEditTerritoryCounties = useCallback((id: number) => {
-    const territory = territories.find((t) => t.id === id);
-    if (!territory) return;
-    setEditingTerritoryId(id);
-    setSelectedCounties(new Set(territory.countyFips));
-    setSelectedColor(territory.color);
-  }, [territories]);
-
-  const handleSaveTerritoryCounties = useCallback(() => {
-    if (editingTerritoryId === null) return;
-    setTerritories((prev) =>
-      prev.map((t) =>
-        t.id === editingTerritoryId
-          ? { ...t, countyFips: Array.from(selectedCounties) }
-          : t
-      )
-    );
-    setEditingTerritoryId(null);
-    setSelectedCounties(new Set());
-  }, [editingTerritoryId, selectedCounties]);
-
-  const handleCancelEditCounties = useCallback(() => {
-    setEditingTerritoryId(null);
-    setSelectedCounties(new Set());
-  }, []);
-
-  const handleClearAllTerritories = useCallback(() => {
-    if (territories.length === 0) return;
-    const confirmed = window.confirm(
-      `Delete all ${territories.length} territor${territories.length === 1 ? "y" : "ies"}? This cannot be undone.`
-    );
-    if (!confirmed) return;
-    setTerritories([]);
-    setEditingTerritoryId(null);
-    setSelectedCounties(new Set());
-    nextIdRef.current = 1;
-  }, [territories.length]);
-
   // --- Export / Import ---
   const handleExportPDF = useCallback(async () => {
-    const svgEl = document.querySelector(
-      "[data-testid='territory-map-svg']"
-    ) as SVGSVGElement | null;
+    const svgEl = mapSvgRef.current;
     if (!svgEl) return;
     // Lazy-loaded so jsPDF/html2canvas stay out of the initial bundle.
     const { exportTerritoryPDF } = await import("@/lib/export-pdf");
@@ -357,10 +196,7 @@ export default function Home() {
             phone: item.phone,
             email: item.email,
           }));
-          setTerritories(imported);
-          nextIdRef.current = nextIdFrom(imported);
-          setEditingTerritoryId(null);
-          setSelectedCounties(new Set());
+          replaceAll(imported);
         } catch {
           setImportError("Could not parse file — is it valid JSON?");
         }
@@ -368,7 +204,7 @@ export default function Home() {
       reader.readAsText(file);
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
-    []
+    [replaceAll]
   );
 
   return (
@@ -454,7 +290,7 @@ export default function Home() {
                 <Download className="w-4 h-4" />
               </HeaderButton>
               <HeaderButton
-                onClick={handleClearAllTerritories}
+                onClick={clearAll}
                 title="Clear all territories"
                 testId="clear-all-btn"
                 destructive
@@ -509,12 +345,13 @@ export default function Home() {
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 relative">
           <TerritoryMap
+            svgRef={mapSvgRef}
             territories={territories}
             selectedCounties={selectedCounties}
             selectedColor={selectedColor}
-            onCountyClick={handleCountyClick}
+            onCountyClick={selectCounty}
             onCountyHover={handleCountyHover}
-            onCountiesDrag={handleCountiesDrag}
+            onCountiesDrag={dragSelectCounties}
             highlightTerritoryId={highlightTerritoryId}
             editingTerritoryId={editingTerritoryId}
           />
@@ -534,15 +371,15 @@ export default function Home() {
               selectedColor={selectedColor}
               colors={colors}
               onColorChange={setSelectedColor}
-              onAddColor={handleAddColor}
-              onRemoveColor={handleRemoveColor}
-              onClearSelection={handleClearSelection}
+              onAddColor={addColor}
+              onRemoveColor={removeColor}
+              onClearSelection={clearSelection}
               onHighlightTerritory={setHighlightTerritoryId}
-              onCreateTerritory={handleCreateTerritory}
-              onDeleteTerritory={handleDeleteTerritory}
-              onEditTerritoryCounties={handleEditTerritoryCounties}
-              onSaveTerritoryCounties={handleSaveTerritoryCounties}
-              onCancelEditCounties={handleCancelEditCounties}
+              onCreateTerritory={createTerritory}
+              onDeleteTerritory={deleteTerritory}
+              onEditTerritoryCounties={startEditingCounties}
+              onSaveTerritoryCounties={saveEditingCounties}
+              onCancelEditCounties={cancelEditingCounties}
               onOpenDetails={setDetailsId}
               editingTerritoryId={editingTerritoryId}
               countyNames={countyNames}
@@ -565,7 +402,7 @@ export default function Home() {
             territory={territory}
             colors={colors}
             usedColors={usedByOthers}
-            onSave={(updates) => handleUpdateTerritory(territory.id, updates)}
+            onSave={(updates) => updateTerritory(territory.id, updates)}
             onClose={() => setDetailsId(null)}
           />
         );
