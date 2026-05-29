@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, type RefObject } from "react";
 import * as d3 from "d3";
 import * as topojson from "topojson-client";
 import type { Topology } from "topojson-specification";
@@ -23,6 +23,7 @@ interface City {
 }
 
 interface TerritoryMapProps {
+  svgRef: RefObject<SVGSVGElement>;
   territories: ClientTerritory[];
   selectedCounties: Set<string>;
   selectedColor: string;
@@ -50,6 +51,7 @@ const STATE_ABBR: Record<string, string> = {
 };
 
 export default function TerritoryMap({
+  svgRef,
   territories,
   selectedCounties,
   selectedColor,
@@ -59,7 +61,6 @@ export default function TerritoryMap({
   highlightTerritoryId,
   editingTerritoryId,
 }: TerritoryMapProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const gRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const pathRef = useRef<d3.GeoPath | null>(null);
@@ -421,7 +422,7 @@ export default function TerritoryMap({
         return pt ? `translate(${pt[0]}, ${pt[1]})` : "";
       }
     );
-  }, [dimensions, geometryReady, topoData]);
+  }, [dimensions, geometryReady, topoData, svgRef]);
 
   // --- STYLE UPDATE — fill/stroke on selection / territory / highlight changes ---
   useEffect(() => {
