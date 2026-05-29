@@ -17,3 +17,7 @@ export const TERRITORY_COLORS = [
   { name: "Slate", value: "#64748b" },
   { name: "Brown", value: "#a16207" },
 ];
+
+/** Fill opacity for assigned territory colors — used by the map, legend, panel,
+ *  and PDF so the color weight stays identical everywhere. */
+export const TERRITORY_FILL_OPACITY = 0.5;

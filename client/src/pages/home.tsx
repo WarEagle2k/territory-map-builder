@@ -4,7 +4,6 @@ import TerritoryPanel from "@/components/TerritoryPanel";
 import MapLegend from "@/components/MapLegend";
 import RepDetailsDialog from "@/components/RepDetailsDialog";
 import { PanelLeftClose, PanelLeft, Download, Upload, FileDown, Trash2 } from "lucide-react";
-import { exportTerritoryPDF } from "@/lib/export-pdf";
 import { TERRITORY_COLORS } from "@/lib/territory-colors";
 import {
   loadTerritories,
@@ -110,8 +109,6 @@ export default function Home() {
   const [editingTerritoryId, setEditingTerritoryId] = useState<number | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [detailsId, setDetailsId] = useState<number | null>(null);
-  // TEMPORARY opacity tuning slider — remove once we settle on a value
-  const [territoryOpacity, setTerritoryOpacity] = useState(0.5);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Persistence ---
@@ -246,12 +243,17 @@ export default function Home() {
   );
 
   const handleDeleteTerritory = useCallback((id: number) => {
+    const target = territories.find((t) => t.id === id);
+    const confirmed = window.confirm(
+      `Delete territory "${target?.name ?? ""}"? This cannot be undone.`
+    );
+    if (!confirmed) return;
     setTerritories((prev) => prev.filter((t) => t.id !== id));
     if (editingTerritoryId === id) {
       setEditingTerritoryId(null);
       setSelectedCounties(new Set());
     }
-  }, [editingTerritoryId]);
+  }, [territories, editingTerritoryId]);
 
   const handleEditTerritoryCounties = useCallback((id: number) => {
     const territory = territories.find((t) => t.id === id);
@@ -292,13 +294,15 @@ export default function Home() {
   }, [territories.length]);
 
   // --- Export / Import ---
-  const handleExportPDF = useCallback(() => {
+  const handleExportPDF = useCallback(async () => {
     const svgEl = document.querySelector(
       "[data-testid='territory-map-svg']"
     ) as SVGSVGElement | null;
     if (!svgEl) return;
-    exportTerritoryPDF(svgEl, territories, countyNames, territoryOpacity);
-  }, [territories, countyNames, territoryOpacity]);
+    // Lazy-loaded so jsPDF/html2canvas stay out of the initial bundle.
+    const { exportTerritoryPDF } = await import("@/lib/export-pdf");
+    exportTerritoryPDF(svgEl, territories, countyNames);
+  }, [territories, countyNames]);
 
   const handleExport = useCallback(() => {
     const data = territories.map((t) => ({
@@ -493,35 +497,12 @@ export default function Home() {
             onCountiesDrag={handleCountiesDrag}
             highlightTerritoryId={highlightTerritoryId}
             editingTerritoryId={editingTerritoryId}
-            territoryOpacity={territoryOpacity}
           />
 
-          {/* TEMP: opacity tuner — remove once we pick a final value */}
-          <div
-            className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm border border-border rounded-lg shadow-md px-3 py-2 flex items-center gap-3 z-20"
-            data-testid="opacity-tuner"
-          >
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Opacity
-            </label>
-            <input
-              type="range"
-              min="0.1"
-              max="1"
-              step="0.05"
-              value={territoryOpacity}
-              onChange={(e) => setTerritoryOpacity(parseFloat(e.target.value))}
-              className="w-40 accent-[hsl(var(--brand-teal))]"
-            />
-            <span className="text-xs font-mono tabular-nums text-foreground w-10 text-right">
-              {territoryOpacity.toFixed(2)}
-            </span>
-          </div>
           <MapLegend
             territories={territories}
             onHighlight={setHighlightTerritoryId}
             onOpenDetails={setDetailsId}
-            swatchOpacity={territoryOpacity}
           />
         </div>
 
@@ -546,7 +527,6 @@ export default function Home() {
               onOpenDetails={setDetailsId}
               editingTerritoryId={editingTerritoryId}
               countyNames={countyNames}
-              swatchOpacity={territoryOpacity}
             />
           </aside>
         )}

@@ -1,18 +1,16 @@
 import type { ClientTerritory } from "@/pages/home";
+import { TERRITORY_FILL_OPACITY } from "@/lib/territory-colors";
 
 interface MapLegendProps {
   territories: ClientTerritory[];
   onHighlight: (id: number | null) => void;
   onOpenDetails?: (id: number) => void;
-  /** Matches the territory fill opacity on the map for visual consistency */
-  swatchOpacity?: number;
 }
 
 export default function MapLegend({
   territories,
   onHighlight,
   onOpenDetails,
-  swatchOpacity = 1,
 }: MapLegendProps) {
   if (territories.length === 0) return null;
 
@@ -42,7 +40,7 @@ export default function MapLegend({
           >
             <div
               className="w-3 h-3 rounded-sm flex-shrink-0 ring-1 ring-black/10"
-              style={{ backgroundColor: t.color, opacity: swatchOpacity }}
+              style={{ backgroundColor: t.color, opacity: TERRITORY_FILL_OPACITY }}
             />
             <span className="text-xs font-medium truncate flex-1">{t.name}</span>
             <span className="text-[10px] text-muted-foreground tabular-nums flex-shrink-0">

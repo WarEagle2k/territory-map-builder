@@ -3,6 +3,7 @@ import * as d3 from "d3";
 import * as topojson from "topojson-client";
 import type { Topology } from "topojson-specification";
 import type { ClientTerritory } from "@/pages/home";
+import { TERRITORY_FILL_OPACITY } from "@/lib/territory-colors";
 
 interface CountyInfo {
   name: string;
@@ -30,8 +31,6 @@ interface TerritoryMapProps {
   onCountiesDrag: (fipsList: string[]) => void;
   highlightTerritoryId: number | null;
   editingTerritoryId: number | null;
-  /** Fill opacity for assigned counties (0-1). Temporary knob for tuning. */
-  territoryOpacity?: number;
 }
 
 // Only 2-digit state FIPS codes are present in our dataset; keep this table
@@ -59,7 +58,6 @@ export default function TerritoryMap({
   onCountiesDrag,
   highlightTerritoryId,
   editingTerritoryId,
-  territoryOpacity = 0.5,
 }: TerritoryMapProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -454,9 +452,9 @@ export default function TerritoryMap({
       })
       .attr("opacity", function () {
         const fips = d3.select(this).attr("data-fips");
-        if (selectedCounties.has(fips)) return Math.min(territoryOpacity + 0.1, 1);
+        if (selectedCounties.has(fips)) return Math.min(TERRITORY_FILL_OPACITY + 0.1, 1);
         const territory = ctMap.get(fips);
-        return territory ? territoryOpacity : 1;
+        return territory ? TERRITORY_FILL_OPACITY : 1;
       });
   }, [
     geometryReady,
@@ -465,7 +463,6 @@ export default function TerritoryMap({
     selectedColor,
     countyToTerritory,
     highlightTerritoryId,
-    territoryOpacity,
   ]);
 
   return (
