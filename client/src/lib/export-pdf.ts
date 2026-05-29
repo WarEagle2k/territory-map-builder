@@ -266,51 +266,24 @@ export async function exportTerritoryPDF(
 
   let mapBottomY = mapTop + mapAreaHeight;
 
-  // Collect all assigned FIPS so the map crops to focus on the territory area
-  const assignedFips = new Set<string>();
-  for (const t of territories) {
-    for (const f of t.countyFips) assignedFips.add(f);
-  }
-
   try {
-    const { dataUrl: mapImage, fullBbox, focusBbox } = await svgToImage(
-      svgEl,
-      assignedFips
-    );
+    const { dataUrl: mapImage, fullBbox } = await svgToImage(svgEl);
 
-    // Clamp map to the mapArea rectangle — anything that falls outside gets
-    // clipped by the page, so we can scale the map up aggressively and still
-    // have surrounding context bleed toward the edges without crashing into
-    // the header or key.
     const mapAreaX = margin;
     const mapAreaY = mapTop;
 
-    const box = focusBbox ?? fullBbox;
-    // Fit the focus box into the map area, then push a little further into
-    // fill territory. Pure fit leaves whitespace when focus aspect ≠ map
-    // aspect; pure fill (max) clips territories. 70-30 weighted blend feels
-    // like "clearly zoomed in" without cropping assigned counties.
-    const fitScale = Math.min(
-      mapAreaWidth / box.width,
-      mapAreaHeight / box.height
+    // Fixed framing: always fit the WHOLE region into the map area and center
+    // it, independent of which territories are filled in. (Previously the map
+    // zoomed to the bounding box of the assigned counties, which blew the zoom
+    // out when territories were few or far apart.) Revisit if the region grows.
+    const scale = Math.min(
+      mapAreaWidth / fullBbox.width,
+      mapAreaHeight / fullBbox.height
     );
-    const fillScale = Math.max(
-      mapAreaWidth / box.width,
-      mapAreaHeight / box.height
-    );
-    const scale = fitScale * 0.85 + fillScale * 0.15;
-
-    // Full rendered image size on the PDF
     const imgW = fullBbox.width * scale;
     const imgH = fullBbox.height * scale;
-
-    // Position: put the center of the focus box at the center of the mapArea
-    const focusCenterX = box.x + box.width / 2;
-    const focusCenterY = box.y + box.height / 2;
-    const mapCenterX = mapAreaX + mapAreaWidth / 2;
-    const mapCenterY = mapAreaY + mapAreaHeight / 2;
-    const imgX = mapCenterX - (focusCenterX - fullBbox.x) * scale;
-    const imgY = mapCenterY - (focusCenterY - fullBbox.y) * scale;
+    const imgX = mapAreaX + (mapAreaWidth - imgW) / 2;
+    const imgY = mapAreaY + (mapAreaHeight - imgH) / 2;
 
     // Clip to the map rectangle so the overflow of the full region gets cut
     // at the map area's edges. jsPDF's rect() also strokes a visible outline
