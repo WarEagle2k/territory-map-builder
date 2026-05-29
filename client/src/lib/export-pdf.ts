@@ -11,27 +11,22 @@ interface Rect {
   height: number;
 }
 
-// Convert SVG element to a PNG data URL via canvas.
-// Renders the full region; returns both the full bounding box used for the
-// image and (optionally) a tighter focus bounding box the caller can use to
-// zoom/position the image on a destination canvas (like a PDF page).
+// Convert the map SVG to a JPEG data URL via canvas, returning the bounding box
+// of the rendered region so the caller can frame it on the PDF page.
 async function svgToImage(
-  svgEl: SVGSVGElement,
-  focusFips?: Set<string>
-): Promise<{ dataUrl: string; fullBbox: Rect; focusBbox: Rect | null }> {
+  svgEl: SVGSVGElement
+): Promise<{ dataUrl: string; fullBbox: Rect }> {
   const clone = svgEl.cloneNode(true) as SVGSVGElement;
   const gEl = clone.querySelector("g");
   if (gEl) gEl.setAttribute("transform", "");
 
   const liveG = svgEl.querySelector("g");
   let fullBbox: Rect;
-  let focusBbox: Rect | null = null;
 
   if (liveG) {
     const origTransform = liveG.getAttribute("transform") || "";
     liveG.setAttribute("transform", "");
 
-    // Full bounds
     const allPaths = liveG.querySelectorAll("path.county, path.state");
     let fMinX = Infinity, fMinY = Infinity, fMaxX = -Infinity, fMaxY = -Infinity;
     allPaths.forEach((el) => {
@@ -48,33 +43,6 @@ async function svgToImage(
       width: fMaxX - fMinX + pad * 2,
       height: fMaxY - fMinY + pad * 2,
     };
-
-    // Focus bounds — only the assigned counties
-    if (focusFips && focusFips.size > 0) {
-      let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
-      let found = false;
-      liveG.querySelectorAll<SVGPathElement>("path.county").forEach((el) => {
-        const fips = el.getAttribute("data-fips");
-        if (!fips || !focusFips.has(fips)) return;
-        const b = el.getBBox();
-        bMinX = Math.min(bMinX, b.x);
-        bMinY = Math.min(bMinY, b.y);
-        bMaxX = Math.max(bMaxX, b.x + b.width);
-        bMaxY = Math.max(bMaxY, b.y + b.height);
-        found = true;
-      });
-      if (found) {
-        // Tight focus — just a sliver of padding so territories aren't flush
-        // against the map edges. Keeps the zoom aggressive.
-        const fpad = Math.max(bMaxX - bMinX, bMaxY - bMinY) * 0.03;
-        focusBbox = {
-          x: bMinX - fpad,
-          y: bMinY - fpad,
-          width: bMaxX - bMinX + fpad * 2,
-          height: bMaxY - bMinY + fpad * 2,
-        };
-      }
-    }
 
     liveG.setAttribute("transform", origTransform);
   } else {
@@ -121,7 +89,6 @@ async function svgToImage(
       resolve({
         dataUrl: canvas.toDataURL("image/jpeg", 0.92),
         fullBbox,
-        focusBbox,
       });
     };
     img.onerror = () => {
@@ -262,7 +229,14 @@ export async function exportTerritoryPDF(
   const keyPadding = 3;
   const keyHeight = keyPadding + keyRows * keyRowHeight;
 
-  const mapAreaHeight = pageH - mapTop - keyHeight - footerHeight - 4;
+  // Fixed map height so the zoom is identical on every export, regardless of how
+  // many territories (and therefore legend rows) there are. Only shrinks if an
+  // unusually long legend would otherwise collide with the footer.
+  const MAP_HEIGHT = 150;
+  const mapAreaHeight = Math.min(
+    MAP_HEIGHT,
+    pageH - mapTop - keyHeight - footerHeight - 4
+  );
 
   let mapBottomY = mapTop + mapAreaHeight;
 
@@ -272,11 +246,13 @@ export async function exportTerritoryPDF(
     const mapAreaX = margin;
     const mapAreaY = mapTop;
 
-    // Fixed framing: always fit the WHOLE region into the map area and center
-    // it, independent of which territories are filled in. (Previously the map
-    // zoomed to the bounding box of the assigned counties, which blew the zoom
-    // out when territories were few or far apart.) Revisit if the region grows.
-    const scale = Math.min(
+    // Fixed framing, independent of which territories are filled in. COVER fit
+    // (max, not min): scale the whole region so it fills the map rectangle and
+    // let the empty extremities (far-west TX, the Carolina/Florida coasts)
+    // overflow and get clipped below. This fills the frame and keeps the
+    // populated core large, matching the reference export. Revisit the crop if
+    // territories expand into those edges.
+    const scale = Math.max(
       mapAreaWidth / fullBbox.width,
       mapAreaHeight / fullBbox.height
     );
