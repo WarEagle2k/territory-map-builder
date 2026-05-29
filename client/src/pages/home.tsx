@@ -301,8 +301,8 @@ export default function Home() {
     if (!svgEl) return;
     // Lazy-loaded so jsPDF/html2canvas stay out of the initial bundle.
     const { exportTerritoryPDF } = await import("@/lib/export-pdf");
-    exportTerritoryPDF(svgEl, territories, countyNames);
-  }, [territories, countyNames]);
+    exportTerritoryPDF(svgEl, territories);
+  }, [territories]);
 
   const handleExport = useCallback(() => {
     const data = territories.map((t) => ({
@@ -519,7 +519,6 @@ export default function Home() {
               onClearSelection={handleClearSelection}
               onHighlightTerritory={setHighlightTerritoryId}
               onCreateTerritory={handleCreateTerritory}
-              onUpdateTerritory={handleUpdateTerritory}
               onDeleteTerritory={handleDeleteTerritory}
               onEditTerritoryCounties={handleEditTerritoryCounties}
               onSaveTerritoryCounties={handleSaveTerritoryCounties}
