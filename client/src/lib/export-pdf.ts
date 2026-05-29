@@ -1,5 +1,6 @@
 import jsPDF, { GState } from "jspdf";
 import type { ClientTerritory } from "@/pages/home";
+import { TERRITORY_FILL_OPACITY } from "@/lib/territory-colors";
 
 interface CountyInfo {
   name: string;
@@ -156,10 +157,7 @@ async function loadImageAsDataUrl(src: string): Promise<string> {
 export async function exportTerritoryPDF(
   svgEl: SVGSVGElement,
   territories: ClientTerritory[],
-  countyNames: Record<string, CountyInfo>,
-  /** Fill opacity used for territory colors on the map — matches the app so
-   *  key swatches and card accents look identical in the PDF. */
-  territoryOpacity = 1
+  countyNames: Record<string, CountyInfo>
 ) {
   // Brand colors
   const deepTeal = [38, 75, 93] as const; // #264b5d
@@ -264,7 +262,7 @@ export async function exportTerritoryPDF(
   // Graphics state that matches the on-screen territory opacity, so the key
   // swatches and card accent bars have the same visual weight as the colors
   // on the map itself.
-  const territoryGState = new GState({ opacity: territoryOpacity });
+  const territoryGState = new GState({ opacity: TERRITORY_FILL_OPACITY });
   const solidGState = new GState({ opacity: 1 });
 
   // === PAGE 1: Map + compact legend ===
@@ -397,7 +395,7 @@ export async function exportTerritoryPDF(
     pdf.addPage();
     drawHeader("Sales Representatives");
 
-    // Two-column directory layout
+    // Two-column directory layout, paginated so no rep is ever dropped.
     const dirTop = 34;
     const dirCols = 2;
     const dirColGap = 8;
@@ -408,11 +406,20 @@ export async function exportTerritoryPDF(
       1,
       Math.floor((pageH - dirTop - footerHeight - 2) / (cardHeight + cardGap))
     );
+    const cardsPerPage = cardsPerCol * dirCols;
 
     territories.forEach((t, i) => {
-      const col = Math.floor(i / cardsPerCol);
-      const row = i % cardsPerCol;
-      if (col >= dirCols) return; // overflow guard
+      // Start a fresh page once the current one fills, so reps beyond the first
+      // page's capacity continue onto page 3, 4, … instead of vanishing.
+      if (i > 0 && i % cardsPerPage === 0) {
+        drawFooter();
+        pdf.addPage();
+        drawHeader("Sales Representatives");
+      }
+
+      const localIndex = i % cardsPerPage;
+      const col = Math.floor(localIndex / cardsPerCol);
+      const row = localIndex % cardsPerCol;
 
       const cardX = margin + col * (dirColWidth + dirColGap);
       const cardY = dirTop + row * (cardHeight + cardGap);

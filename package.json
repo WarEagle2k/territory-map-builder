@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.0",
-    "@radix-ui/react-toast": "^1.2.7",
     "@types/d3": "^7.4.3",
     "@types/topojson-client": "^3.1.5",
     "@types/topojson-specification": "^1.0.5",

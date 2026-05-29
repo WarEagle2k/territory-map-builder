@@ -20,6 +20,7 @@ import {
   Building2,
 } from "lucide-react";
 import type { ClientTerritory } from "@/pages/home";
+import { TERRITORY_FILL_OPACITY } from "@/lib/territory-colors";
 
 interface ColorOption {
   name: string;
@@ -45,8 +46,6 @@ interface TerritoryPanelProps {
   onOpenDetails: (id: number) => void;
   editingTerritoryId: number | null;
   countyNames: Record<string, { name: string; state: string }>;
-  /** Match on-map territory opacity for visual consistency */
-  swatchOpacity?: number;
 }
 
 export default function TerritoryPanel({
@@ -68,7 +67,6 @@ export default function TerritoryPanel({
   onOpenDetails,
   editingTerritoryId,
   countyNames,
-  swatchOpacity = 1,
 }: TerritoryPanelProps) {
   const [territoryName, setTerritoryName] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -361,13 +359,13 @@ export default function TerritoryPanel({
                 {/* Colored left accent bar — 3px wide */}
                 <div
                   className="absolute left-0 top-0 bottom-0 w-[3px]"
-                  style={{ backgroundColor: t.color, opacity: swatchOpacity }}
+                  style={{ backgroundColor: t.color, opacity: TERRITORY_FILL_OPACITY }}
                   aria-hidden
                 />
                 <div className="flex items-center gap-2">
                   <div
                     className="w-3 h-3 rounded-full flex-shrink-0 ring-1 ring-black/10"
-                    style={{ backgroundColor: t.color, opacity: swatchOpacity }}
+                    style={{ backgroundColor: t.color, opacity: TERRITORY_FILL_OPACITY }}
                   />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{t.name}</div>

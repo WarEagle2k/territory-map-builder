@@ -1,6 +1,5 @@
 import { Switch, Route, Router } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
-import { Toaster } from "@/components/ui/toaster";
 import Home from "@/pages/home";
 import NotFound from "@/pages/not-found";
 
@@ -16,12 +15,7 @@ function AppRouter() {
 }
 
 function App() {
-  return (
-    <>
-      <AppRouter />
-      <Toaster />
-    </>
-  );
+  return <AppRouter />;
 }
 
 export default App;
