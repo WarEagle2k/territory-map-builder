@@ -473,6 +473,8 @@ export default function TerritoryMap({
         className="w-full h-full"
         style={{ userSelect: "none" }}
         data-testid="territory-map-svg"
+        role="application"
+        aria-label="Interactive territory map — click or drag counties to build territories"
       />
       {/* Bottom captions — one flex bar so the hint and attribution never overlap */}
       <div className="absolute bottom-2 inset-x-2 flex items-end justify-between gap-4 text-[10px] text-muted-foreground/60 select-none pointer-events-none">

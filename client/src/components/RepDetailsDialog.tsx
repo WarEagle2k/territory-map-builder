@@ -41,6 +41,7 @@ export default function RepDetailsDialog({
   const [email, setEmail] = useState(territory.email ?? "");
   const [color, setColor] = useState(territory.color);
   const firstInputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Focus the first field on mount
   useEffect(() => {
@@ -48,10 +49,27 @@ export default function RepDetailsDialog({
     firstInputRef.current?.select();
   }, []);
 
-  // Close on Escape
+  // Close on Escape; keep Tab focus trapped inside the dialog
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -85,6 +103,7 @@ export default function RepDetailsDialog({
       aria-labelledby="rep-details-title"
     >
       <div
+        ref={dialogRef}
         className="bg-card rounded-lg shadow-xl w-full max-w-md overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
