@@ -234,9 +234,18 @@ export default function TerritoryMap({
     };
     document.addEventListener("mouseup", handleMouseUp);
 
-    // Highway overlay, clipped to state boundaries
+    // Motorway overlay from OpenStreetMap — every limited-access freeway in
+    // the region regardless of designation (interstates, state toll roads,
+    // tollways like Houston's Beltway 8 and Grand Parkway). Features are
+    // already filtered to `highway=motorway` at data-build time, so we render
+    // everything in the file.
+    //
+    // Clipped to state boundaries so segments don't bleed past the region.
+    // Drawn as a dark-maroon casing under a saturated burgundy-red fill —
+    // distinct hue from both the slate state borders and the pastel
+    // territory fills.
     if (highwayData) {
-      const highways = topojson.feature(
+      const motorways = topojson.feature(
         highwayData,
         highwayData.objects.highways
       ) as unknown as GeoJSON.FeatureCollection;
@@ -250,17 +259,37 @@ export default function TerritoryMap({
         .join("path")
         .attr("d", path);
 
-      g.selectAll("path.highway")
-        .data(highways.features)
-        .join("path")
-        .attr("class", "highway")
-        .attr("d", path)
-        .attr("fill", "none")
-        .attr("stroke", "#922b21")
-        .attr("stroke-width", 0.5)
-        .attr("stroke-opacity", 0.4)
-        .attr("clip-path", `url(#${clipId})`)
-        .style("pointer-events", "none");
+      const applyRoadBase = (
+        sel: d3.Selection<SVGPathElement, GeoJSON.Feature, SVGGElement, unknown>
+      ) =>
+        sel
+          .attr("d", path)
+          .attr("fill", "none")
+          .attr("stroke-linecap", "round")
+          .attr("stroke-linejoin", "round")
+          .attr("clip-path", `url(#${clipId})`)
+          .style("pointer-events", "none");
+
+      applyRoadBase(
+        g
+          .selectAll<SVGPathElement, GeoJSON.Feature>("path.i-casing")
+          .data(motorways.features)
+          .join("path")
+          .attr("class", "highway i-casing")
+          .attr("stroke", "#4a1a13")
+          .attr("stroke-width", 1.0)
+          .attr("stroke-opacity", 0.85)
+      );
+      applyRoadBase(
+        g
+          .selectAll<SVGPathElement, GeoJSON.Feature>("path.i-fill")
+          .data(motorways.features)
+          .join("path")
+          .attr("class", "highway i-fill")
+          .attr("stroke", "#a83a28")
+          .attr("stroke-width", 0.51)
+          .attr("stroke-opacity", 1.0)
+      );
     }
 
     // State borders
@@ -280,7 +309,7 @@ export default function TerritoryMap({
       const cityGroup = g.append("g").attr("class", "cities-layer");
 
       // Uniform style for every city — no tier-based emphasis
-      const tierStyle = (_t: 1 | 2 | 3) => ({ r: 1.0, fs: 6, fw: 400, opacity: 0.6 });
+      const tierStyle = (_t: 1 | 2 | 3) => ({ r: 0.75, fs: 6, fw: 400, opacity: 0.6 });
 
       cityGroup
         .selectAll("g.city")
@@ -298,7 +327,7 @@ export default function TerritoryMap({
           // Dot (white halo + dark center)
           group
             .append("circle")
-            .attr("r", s.r + 0.8)
+            .attr("r", s.r + 0.6)
             .attr("fill", "#ffffff")
             .attr("opacity", 0.9);
           group
@@ -449,6 +478,17 @@ export default function TerritoryMap({
       />
       <div className="absolute bottom-2 left-2 text-[10px] text-muted-foreground/60 pointer-events-none select-none">
         Scroll to zoom · Shift+drag to pan · Click or drag to select counties
+      </div>
+      <div className="absolute bottom-2 right-2 text-[10px] text-muted-foreground/60 select-none">
+        Highways ©{" "}
+        <a
+          href="https://www.openstreetmap.org/copyright"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-muted-foreground"
+        >
+          OpenStreetMap contributors
+        </a>
       </div>
     </div>
   );

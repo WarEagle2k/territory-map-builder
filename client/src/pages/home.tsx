@@ -115,11 +115,29 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Persistence ---
+  //
+  // Mount-guard is CRITICAL: if loadTerritories()/loadColors() ever returns
+  // null (schema validation failure, corrupted JSON, quota issues, etc.),
+  // useState falls back to [] / default colors. Without the guard, the effect
+  // would fire on the initial mount and immediately write that empty fallback
+  // over whatever was in localStorage — silently wiping the user's real data.
+  // Skipping the first run means we only persist state that the user has
+  // actively changed.
+  const didMountTerritories = useRef(false);
   useEffect(() => {
+    if (!didMountTerritories.current) {
+      didMountTerritories.current = true;
+      return;
+    }
     saveTerritories(territories as StoredTerritory[]);
   }, [territories]);
 
+  const didMountColors = useRef(false);
   useEffect(() => {
+    if (!didMountColors.current) {
+      didMountColors.current = true;
+      return;
+    }
     saveColors(colors);
   }, [colors]);
 
