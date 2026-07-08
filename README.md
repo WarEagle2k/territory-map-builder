@@ -26,15 +26,16 @@ to run on a different port (useful when 3000 is already taken).
 
 ## Scripts
 
-| Script            | Description                     |
-| ----------------- | ------------------------------- |
-| `npm run dev`     | Start the Vite dev server       |
-| `npm run build`   | Production build to `dist/`     |
-| `npm run preview` | Preview the production build    |
-| `npm run check`   | TypeScript type-check (no emit) |
-| `npm run lint`    | Run ESLint                      |
-| `npm run format`  | Format with Prettier            |
-| `npm test`        | Run the Vitest unit tests       |
+| Script                 | Description                      |
+| ---------------------- | -------------------------------- |
+| `npm run dev`          | Start the Vite dev server        |
+| `npm run build`        | Production build to `dist/`      |
+| `npm run preview`      | Preview the production build     |
+| `npm run check`        | TypeScript type-check (no emit)  |
+| `npm run lint`         | Run ESLint                       |
+| `npm run format`       | Format with Prettier             |
+| `npm run format:check` | Check formatting without writing |
+| `npm test`             | Run the Vitest unit tests        |
 
 ## Project structure
 
@@ -43,8 +44,9 @@ client/
   public/            Static map data (see below) + CSI logo
   src/
     components/      Map, side panel, legend, rep dialog, shadcn UI primitives
-    lib/             storage (persistence + Zod schemas), export-pdf, validation, colors
-    pages/           home (app shell + state)
+    lib/             use-territories (territory state hook), storage (persistence +
+                     Zod schemas), export-pdf, validation, colors
+    pages/           home (app shell, layout, import/export)
 ```
 
 ## Usage notes
