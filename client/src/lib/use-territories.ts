@@ -24,19 +24,19 @@ function nextIdFrom(territories: { id: number }[]): number {
  */
 export function useTerritories() {
   const [territories, setTerritories] = useState<ClientTerritory[]>(
-    () => loadTerritories() ?? []
+    () => loadTerritories() ?? [],
   );
   const [colors, setColors] = useState<ColorOption[]>(
-    () => loadColors() ?? TERRITORY_COLORS
+    () => loadColors() ?? TERRITORY_COLORS,
   );
   const [selectedCounties, setSelectedCounties] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [selectedColor, setSelectedColor] = useState(
-    colors[0]?.value ?? "#3b82f6"
+    colors[0]?.value ?? "#3b82f6",
   );
   const [editingTerritoryId, setEditingTerritoryId] = useState<number | null>(
-    null
+    null,
   );
   const nextIdRef = useRef(nextIdFrom(territories));
 
@@ -64,6 +64,21 @@ export function useTerritories() {
     saveColors(colors);
   }, [colors]);
 
+  // Keep the painting color usable: if the selected color is already used by a
+  // territory (right after creating one, after an import, or on reload when
+  // colors[0] is taken) or was removed from the palette, advance to the first
+  // unused palette color — matching the disabled swatches in the panel.
+  // Skipped while editing counties, where the color is set to the territory's
+  // own (possibly non-palette) color on purpose.
+  useEffect(() => {
+    if (editingTerritoryId !== null) return;
+    const used = new Set(territories.map((t) => t.color));
+    const inPalette = colors.some((c) => c.value === selectedColor);
+    if (inPalette && !used.has(selectedColor)) return;
+    const firstFree = colors.find((c) => !used.has(c.value));
+    if (firstFree) setSelectedColor(firstFree.value);
+  }, [territories, colors, editingTerritoryId, selectedColor]);
+
   // Counties already assigned to a territory (excluding the one being edited).
   const assignedCounties = useMemo(() => {
     const set = new Set<string>();
@@ -85,18 +100,11 @@ export function useTerritories() {
     });
   }, []);
 
-  const removeColor = useCallback(
-    (value: string) => {
-      setColors((prev) => {
-        const next = prev.filter((c) => c.value !== value);
-        if (selectedColor === value && next.length > 0) {
-          setSelectedColor(next[0].value);
-        }
-        return next;
-      });
-    },
-    [selectedColor]
-  );
+  // If the removed color was selected, the palette-validity effect above
+  // moves the selection to the first available color.
+  const removeColor = useCallback((value: string) => {
+    setColors((prev) => prev.filter((c) => c.value !== value));
+  }, []);
 
   // --- County selection ---
   const selectCounty = useCallback(
@@ -109,7 +117,7 @@ export function useTerritories() {
         return next;
       });
     },
-    [assignedCounties]
+    [assignedCounties],
   );
 
   const dragSelectCounties = useCallback(
@@ -122,7 +130,7 @@ export function useTerritories() {
         return next;
       });
     },
-    [assignedCounties]
+    [assignedCounties],
   );
 
   const clearSelection = useCallback(() => {
@@ -132,13 +140,16 @@ export function useTerritories() {
   // --- Territory CRUD ---
   const createTerritory = useCallback(
     (name: string, color: string, counties: string[]) => {
-      setTerritories((prev) => {
-        const id = nextIdRef.current++;
-        return [...prev, { id, name, color, countyFips: counties }];
-      });
+      // Take the id outside the updater — updaters must stay pure (React can
+      // invoke them more than once), so the ref mutation can't live inside.
+      const id = nextIdRef.current++;
+      setTerritories((prev) => [
+        ...prev,
+        { id, name, color, countyFips: counties },
+      ]);
       setSelectedCounties(new Set());
     },
-    []
+    [],
   );
 
   const updateTerritory = useCallback(
@@ -149,20 +160,20 @@ export function useTerritories() {
           ClientTerritory,
           "name" | "color" | "title" | "branch" | "phone" | "email"
         >
-      >
+      >,
     ) => {
       setTerritories((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
+        prev.map((t) => (t.id === id ? { ...t, ...updates } : t)),
       );
     },
-    []
+    [],
   );
 
   const deleteTerritory = useCallback(
     (id: number) => {
       const target = territories.find((t) => t.id === id);
       const confirmed = window.confirm(
-        `Delete territory "${target?.name ?? ""}"? This cannot be undone.`
+        `Delete territory "${target?.name ?? ""}"? This cannot be undone.`,
       );
       if (!confirmed) return;
       setTerritories((prev) => prev.filter((t) => t.id !== id));
@@ -171,7 +182,7 @@ export function useTerritories() {
         setSelectedCounties(new Set());
       }
     },
-    [territories, editingTerritoryId]
+    [territories, editingTerritoryId],
   );
 
   // --- Re-editing an existing territory's counties ---
@@ -183,7 +194,7 @@ export function useTerritories() {
       setSelectedCounties(new Set(territory.countyFips));
       setSelectedColor(territory.color);
     },
-    [territories]
+    [territories],
   );
 
   const saveEditingCounties = useCallback(() => {
@@ -192,8 +203,8 @@ export function useTerritories() {
       prev.map((t) =>
         t.id === editingTerritoryId
           ? { ...t, countyFips: Array.from(selectedCounties) }
-          : t
-      )
+          : t,
+      ),
     );
     setEditingTerritoryId(null);
     setSelectedCounties(new Set());
@@ -209,7 +220,7 @@ export function useTerritories() {
     const confirmed = window.confirm(
       `Delete all ${territories.length} territor${
         territories.length === 1 ? "y" : "ies"
-      }? This cannot be undone.`
+      }? This cannot be undone.`,
     );
     if (!confirmed) return;
     setTerritories([]);

@@ -18,20 +18,23 @@ branded PDF.
 
 ```bash
 npm install
-npm run dev      # start the Vite dev server (default http://localhost:5173)
+npm run dev      # start the Vite dev server (default http://localhost:3000)
 ```
+
+The dev server uses port 3000 by default; set the `PORT` environment variable
+to run on a different port (useful when 3000 is already taken).
 
 ## Scripts
 
-| Script | Description |
-| --- | --- |
-| `npm run dev` | Start the Vite dev server |
-| `npm run build` | Production build to `dist/` |
-| `npm run preview` | Preview the production build |
-| `npm run check` | TypeScript type-check (no emit) |
-| `npm run lint` | Run ESLint |
-| `npm run format` | Format with Prettier |
-| `npm test` | Run the Vitest unit tests |
+| Script            | Description                     |
+| ----------------- | ------------------------------- |
+| `npm run dev`     | Start the Vite dev server       |
+| `npm run build`   | Production build to `dist/`     |
+| `npm run preview` | Preview the production build    |
+| `npm run check`   | TypeScript type-check (no emit) |
+| `npm run lint`    | Run ESLint                      |
+| `npm run format`  | Format with Prettier            |
+| `npm test`        | Run the Vitest unit tests       |
 
 ## Project structure
 
@@ -43,6 +46,19 @@ client/
     lib/             storage (persistence + Zod schemas), export-pdf, validation, colors
     pages/           home (app shell + state)
 ```
+
+## Usage notes
+
+- **One color per territory.** Colors already used by another territory are
+  disabled in the palette, and after saving a territory the brush automatically
+  advances to the next unused color.
+- **Import replaces everything.** Importing a JSON file swaps in the file's
+  territories in place of the current set; the app asks for confirmation first
+  if you have existing territories. Export (JSON) from the header to back up
+  the current set before importing.
+- **Data lives in your browser.** Territories persist to `localStorage` on the
+  machine/browser where you built them. Use JSON export/import to move a map
+  between machines, and PDF export to share the finished map.
 
 ## Map data
 
