@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { X, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,8 +17,11 @@ interface RepDetailsDialogProps {
   usedColors: Set<string>;
   onSave: (
     updates: Partial<
-      Pick<ClientTerritory, "name" | "title" | "branch" | "phone" | "email" | "color">
-    >
+      Pick<
+        ClientTerritory,
+        "name" | "title" | "branch" | "phone" | "email" | "color"
+      >
+    >,
   ) => void;
   onClose: () => void;
 }
@@ -49,16 +52,32 @@ export default function RepDetailsDialog({
     firstInputRef.current?.select();
   }, []);
 
+  const dirty =
+    name !== territory.name ||
+    title !== (territory.title ?? "") ||
+    branch !== (territory.branch ?? "") ||
+    phone !== (territory.phone ?? "") ||
+    email !== (territory.email ?? "") ||
+    color !== territory.color;
+
+  // Escape / backdrop / X / Cancel all discard edits — confirm first when
+  // there's something to lose. Saving goes through onClose directly.
+  const requestClose = useCallback(() => {
+    if (dirty && !window.confirm("Discard unsaved changes to this rep?"))
+      return;
+    onClose();
+  }, [dirty, onClose]);
+
   // Close on Escape; keep Tab focus trapped inside the dialog
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        requestClose();
         return;
       }
       if (e.key !== "Tab" || !dialogRef.current) return;
       const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+        'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
       );
       if (focusable.length === 0) return;
       const first = focusable[0];
@@ -73,7 +92,7 @@ export default function RepDetailsDialog({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [requestClose]);
 
   const phoneError = validatePhone(phone);
   const emailError = validateEmail(email);
@@ -96,7 +115,7 @@ export default function RepDetailsDialog({
   return (
     <div
       className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
+      onClick={requestClose}
       data-testid="rep-details-dialog"
       role="dialog"
       aria-modal="true"
@@ -125,7 +144,7 @@ export default function RepDetailsDialog({
             </h2>
           </div>
           <button
-            onClick={onClose}
+            onClick={requestClose}
             className="p-1 rounded hover:bg-white/10 transition-colors"
             aria-label="Close"
           >
@@ -177,12 +196,19 @@ export default function RepDetailsDialog({
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1.5">
               Color
             </label>
-            <div className="flex flex-wrap gap-1.5" data-testid="rep-color-picker">
+            <div
+              className="flex flex-wrap gap-1.5"
+              data-testid="rep-color-picker"
+            >
               {colors.map((c) => {
-                const isUsedByOther = usedColors.has(c.value) && c.value !== territory.color;
+                const isUsedByOther =
+                  usedColors.has(c.value) && c.value !== territory.color;
                 const isSelected = color === c.value;
                 return (
-                  <div key={c.value} className="relative w-6 h-6 flex items-center justify-center">
+                  <div
+                    key={c.value}
+                    className="relative w-6 h-6 flex items-center justify-center"
+                  >
                     <button
                       type="button"
                       className={`w-6 h-6 rounded-full border-2 transition-transform ${
@@ -192,7 +218,9 @@ export default function RepDetailsDialog({
                       } ${isUsedByOther ? "opacity-50 cursor-not-allowed" : ""}`}
                       style={{ backgroundColor: c.value }}
                       disabled={isUsedByOther}
-                      title={isUsedByOther ? `${c.name} (already used)` : c.name}
+                      title={
+                        isUsedByOther ? `${c.name} (already used)` : c.name
+                      }
                       onClick={() => setColor(c.value)}
                       data-testid={`rep-color-${c.name.toLowerCase()}`}
                     />
@@ -221,7 +249,11 @@ export default function RepDetailsDialog({
                 data-testid="rep-phone-input"
                 aria-invalid={!!phoneError}
                 aria-describedby={phoneError ? "rep-phone-error" : undefined}
-                className={phoneError ? "border-destructive focus-visible:ring-destructive" : ""}
+                className={
+                  phoneError
+                    ? "border-destructive focus-visible:ring-destructive"
+                    : ""
+                }
               />
               {phoneError && (
                 <p
@@ -245,7 +277,11 @@ export default function RepDetailsDialog({
                 data-testid="rep-email-input"
                 aria-invalid={!!emailError}
                 aria-describedby={emailError ? "rep-email-error" : undefined}
-                className={emailError ? "border-destructive focus-visible:ring-destructive" : ""}
+                className={
+                  emailError
+                    ? "border-destructive focus-visible:ring-destructive"
+                    : ""
+                }
               />
               {emailError && (
                 <p
@@ -263,7 +299,7 @@ export default function RepDetailsDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={requestClose}
               data-testid="rep-cancel-btn"
             >
               Cancel

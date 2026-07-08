@@ -4,37 +4,114 @@ import { TERRITORY_FILL_OPACITY } from "@/lib/territory-colors";
 import { normalizePhone } from "@/lib/validation";
 
 // Rect in SVG coordinates
-interface Rect {
+export interface Rect {
   x: number;
   y: number;
   width: number;
   height: number;
 }
 
-// Convert the map SVG to a JPEG data URL via canvas, returning the bounding box
-// of the rendered region so the caller can frame it on the PDF page.
+/**
+ * Decide how the map image is framed on the PDF page.
+ *
+ * Default framing is COVER-fit centered on the full region: scale so the
+ * region fills the frame and let the empty extremities (far-west TX, the
+ * coasts) overflow and get clipped. That keeps the populated core large and
+ * the zoom identical on every export.
+ *
+ * BUT the crop must never cut off an actual territory. When `territories`
+ * (the bbox of all assigned counties) doesn't fit inside the cover window,
+ * first zoom out just enough for it to fit, then shift the window minimally
+ * to contain it — clamped to the region so we don't frame empty space.
+ * When the territories already fit, the result is identical to plain cover.
+ *
+ * Returns the scale (frame units per SVG unit) and the visible window's
+ * origin in SVG coordinates.
+ */
+export function computeMapFrame(
+  full: Rect,
+  territories: Rect | null,
+  frameW: number,
+  frameH: number,
+): { scale: number; winX: number; winY: number } {
+  let scale = Math.max(frameW / full.width, frameH / full.height);
+  if (territories) {
+    scale = Math.min(
+      scale,
+      frameW / territories.width,
+      frameH / territories.height,
+    );
+  }
+  const winW = frameW / scale;
+  const winH = frameH / scale;
+
+  // Start centered on the full region (plain cover behavior)
+  let winX = full.x + (full.width - winW) / 2;
+  let winY = full.y + (full.height - winH) / 2;
+
+  if (territories) {
+    // Shift minimally so the territory extent is inside the window
+    if (territories.x < winX) winX = territories.x;
+    else if (territories.x + territories.width > winX + winW)
+      winX = territories.x + territories.width - winW;
+    if (territories.y < winY) winY = territories.y;
+    else if (territories.y + territories.height > winY + winH)
+      winY = territories.y + territories.height - winH;
+
+    // Keep the window inside the region when it fits; center it when the
+    // window is larger than the region on that axis.
+    if (winW < full.width)
+      winX = Math.min(Math.max(winX, full.x), full.x + full.width - winW);
+    else winX = full.x + (full.width - winW) / 2;
+    if (winH < full.height)
+      winY = Math.min(Math.max(winY, full.y), full.y + full.height - winH);
+    else winY = full.y + (full.height - winH) / 2;
+  }
+
+  return { scale, winX, winY };
+}
+
+// Convert the map SVG to a JPEG data URL via canvas, returning the bounding
+// box of the rendered region — and of the assigned-territory counties, so the
+// caller can guarantee they stay inside the PDF frame.
 async function svgToImage(
-  svgEl: SVGSVGElement
-): Promise<{ dataUrl: string; fullBbox: Rect }> {
+  svgEl: SVGSVGElement,
+  territoryFips: Set<string>,
+): Promise<{ dataUrl: string; fullBbox: Rect; territoryBbox: Rect | null }> {
   const clone = svgEl.cloneNode(true) as SVGSVGElement;
   const gEl = clone.querySelector("g");
   if (gEl) gEl.setAttribute("transform", "");
 
   const liveG = svgEl.querySelector("g");
   let fullBbox: Rect;
+  let territoryBbox: Rect | null = null;
 
   if (liveG) {
     const origTransform = liveG.getAttribute("transform") || "";
     liveG.setAttribute("transform", "");
 
     const allPaths = liveG.querySelectorAll("path.county, path.state");
-    let fMinX = Infinity, fMinY = Infinity, fMaxX = -Infinity, fMaxY = -Infinity;
+    let fMinX = Infinity,
+      fMinY = Infinity,
+      fMaxX = -Infinity,
+      fMaxY = -Infinity;
+    let tMinX = Infinity,
+      tMinY = Infinity,
+      tMaxX = -Infinity,
+      tMaxY = -Infinity;
     allPaths.forEach((el) => {
       const b = (el as SVGPathElement).getBBox();
       fMinX = Math.min(fMinX, b.x);
       fMinY = Math.min(fMinY, b.y);
       fMaxX = Math.max(fMaxX, b.x + b.width);
       fMaxY = Math.max(fMaxY, b.y + b.height);
+      const fips = el.getAttribute("data-fips");
+      if (fips && territoryFips.has(fips)) {
+        tMinX = Math.min(tMinX, b.x);
+        tMinY = Math.min(tMinY, b.y);
+        tMaxX = Math.max(tMaxX, b.x + b.width);
+        tMaxY = Math.max(tMaxY, b.y + b.height);
+      }
     });
     const pad = 10;
     fullBbox = {
@@ -43,6 +120,16 @@ async function svgToImage(
       width: fMaxX - fMinX + pad * 2,
       height: fMaxY - fMinY + pad * 2,
     };
+    if (tMinX !== Infinity) {
+      // Small breathing room so territories don't touch the frame edge
+      const tPad = 6;
+      territoryBbox = {
+        x: tMinX - tPad,
+        y: tMinY - tPad,
+        width: tMaxX - tMinX + tPad * 2,
+        height: tMaxY - tMinY + tPad * 2,
+      };
+    }
 
     liveG.setAttribute("transform", origTransform);
   } else {
@@ -58,7 +145,10 @@ async function svgToImage(
   const bbox = fullBbox;
 
   // Set the viewBox to the tight bounding box so we only capture the map content
-  clone.setAttribute("viewBox", `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`);
+  clone.setAttribute(
+    "viewBox",
+    `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`,
+  );
   clone.setAttribute("width", String(bbox.width));
   clone.setAttribute("height", String(bbox.height));
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
@@ -89,6 +179,7 @@ async function svgToImage(
       resolve({
         dataUrl: canvas.toDataURL("image/jpeg", 0.92),
         fullBbox,
+        territoryBbox,
       });
     };
     img.onerror = () => {
@@ -119,14 +210,18 @@ async function loadImageAsDataUrl(src: string): Promise<string> {
 
 export async function exportTerritoryPDF(
   svgEl: SVGSVGElement,
-  territories: ClientTerritory[]
+  territories: ClientTerritory[],
 ) {
   // Brand colors
   const deepTeal = [38, 75, 93] as const; // #264b5d
   const gold = [253, 205, 7] as const; // #fdcd07
 
   // Create landscape PDF
-  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
+  const pdf = new jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: "letter",
+  });
   const pageW = pdf.internal.pageSize.getWidth(); // 279.4mm
   const pageH = pdf.internal.pageSize.getHeight(); // 215.9mm
   const margin = 12;
@@ -192,9 +287,11 @@ export async function exportTerritoryPDF(
     pdf.text(
       "Connector Specialists Incorporated | Territory Map",
       margin,
-      pageH - 3
+      pageH - 3,
     );
-    pdf.text(`Generated ${date}`, pageW - margin, pageH - 3, { align: "right" });
+    pdf.text(`Generated ${date}`, pageW - margin, pageH - 3, {
+      align: "right",
+    });
   };
 
   // Helper: truncate a string so it fits a given px width
@@ -235,31 +332,35 @@ export async function exportTerritoryPDF(
   const MAP_HEIGHT = 150;
   const mapAreaHeight = Math.min(
     MAP_HEIGHT,
-    pageH - mapTop - keyHeight - footerHeight - 4
+    pageH - mapTop - keyHeight - footerHeight - 4,
   );
 
   let mapBottomY = mapTop + mapAreaHeight;
 
   try {
-    const { dataUrl: mapImage, fullBbox } = await svgToImage(svgEl);
+    const assignedFips = new Set(territories.flatMap((t) => t.countyFips));
+    const {
+      dataUrl: mapImage,
+      fullBbox,
+      territoryBbox,
+    } = await svgToImage(svgEl, assignedFips);
 
     const mapAreaX = margin;
     const mapAreaY = mapTop;
 
-    // Fixed framing, independent of which territories are filled in. COVER fit
-    // (max, not min): scale the whole region so it fills the map rectangle and
-    // let the empty extremities (far-west TX, the Carolina/Florida coasts)
-    // overflow and get clipped below. This fills the frame and keeps the
-    // populated core large, matching the reference export. Revisit the crop if
-    // territories expand into those edges.
-    const scale = Math.max(
-      mapAreaWidth / fullBbox.width,
-      mapAreaHeight / fullBbox.height
+    // Cover-fit framing centered on the region, adjusted (zoomed out /
+    // shifted) only as much as needed so no assigned county is cropped out.
+    // See computeMapFrame for the full rules.
+    const { scale, winX, winY } = computeMapFrame(
+      fullBbox,
+      territoryBbox,
+      mapAreaWidth,
+      mapAreaHeight,
     );
     const imgW = fullBbox.width * scale;
     const imgH = fullBbox.height * scale;
-    const imgX = mapAreaX + (mapAreaWidth - imgW) / 2;
-    const imgY = mapAreaY + (mapAreaHeight - imgH) / 2;
+    const imgX = mapAreaX - (winX - fullBbox.x) * scale;
+    const imgY = mapAreaY - (winY - fullBbox.y) * scale;
 
     // Clip to the map rectangle so the overflow of the full region gets cut
     // at the map area's edges. jsPDF's rect() also strokes a visible outline
@@ -279,9 +380,14 @@ export async function exportTerritoryPDF(
   } catch {
     pdf.setTextColor(150, 150, 150);
     pdf.setFontSize(12);
-    pdf.text("Map could not be rendered", pageW / 2, mapTop + mapAreaHeight / 2, {
-      align: "center",
-    });
+    pdf.text(
+      "Map could not be rendered",
+      pageW / 2,
+      mapTop + mapAreaHeight / 2,
+      {
+        align: "center",
+      },
+    );
   }
 
   // --- COMPACT KEY (just the swatches + names below the map) ---
@@ -319,7 +425,7 @@ export async function exportTerritoryPDF(
   // === PAGE 2: Rep directory with full contact details ===
   // Only add if any rep has something to show beyond name
   const hasDetails = territories.some(
-    (t) => t.title || t.branch || t.phone || t.email
+    (t) => t.title || t.branch || t.phone || t.email,
   );
   if (hasDetails) {
     pdf.addPage();
@@ -334,7 +440,7 @@ export async function exportTerritoryPDF(
     const cardGap = 2;
     const cardsPerCol = Math.max(
       1,
-      Math.floor((pageH - dirTop - footerHeight - 2) / (cardHeight + cardGap))
+      Math.floor((pageH - dirTop - footerHeight - 2) / (cardHeight + cardGap)),
     );
     const cardsPerPage = cardsPerCol * dirCols;
 
@@ -409,7 +515,11 @@ export async function exportTerritoryPDF(
         pdf.text("Phone:", textX, lineY);
         pdf.setFont("helvetica", "normal");
         pdf.setTextColor(30, 30, 30);
-        pdf.text(fit(normalizePhone(t.phone), textMaxW - 15), textX + 13, lineY);
+        pdf.text(
+          fit(normalizePhone(t.phone), textMaxW - 15),
+          textX + 13,
+          lineY,
+        );
         lineY += 4;
       }
 

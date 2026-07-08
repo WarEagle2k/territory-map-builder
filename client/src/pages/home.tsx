@@ -150,7 +150,10 @@ export default function Home() {
   // --- Export / Import ---
   const handleExportPDF = useCallback(async () => {
     const svgEl = mapSvgRef.current;
-    if (!svgEl) return;
+    // The map paths must exist to capture — guards against clicking export
+    // while the map data is still loading (territories can already be in
+    // localStorage before the geometry arrives).
+    if (!svgEl || !svgEl.querySelector("path.county")) return;
     // Lazy-loaded so jsPDF/html2canvas stay out of the initial bundle.
     const { exportTerritoryPDF } = await import("@/lib/export-pdf");
     exportTerritoryPDF(svgEl, territories);

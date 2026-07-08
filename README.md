@@ -61,6 +61,10 @@ client/
 - **Data lives in your browser.** Territories persist to `localStorage` on the
   machine/browser where you built them. Use JSON export/import to move a map
   between machines, and PDF export to share the finished map.
+- **PDF framing is territory-aware.** The exported map uses a fixed cover-fit
+  crop of the region for a consistent look, but automatically zooms out or
+  shifts just enough that no assigned county is ever cropped out — even
+  territories at the region's edges (far-west Texas, south Florida).
 
 ## Map data
 
