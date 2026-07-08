@@ -98,6 +98,9 @@ export function useTerritories() {
       if (prev.some((c) => c.value.toLowerCase() === normalized)) return prev;
       return [...prev, { name: normalized.toUpperCase(), value: normalized }];
     });
+    // A just-added color is what the user wants to paint with next. (If it's
+    // actually in use already, the palette-validity effect bounces it.)
+    setSelectedColor(normalized);
   }, []);
 
   // If the removed color was selected, the palette-validity effect above

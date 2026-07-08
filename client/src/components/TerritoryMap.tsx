@@ -1,4 +1,10 @@
-import { useEffect, useRef, useCallback, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useRef,
+  useCallback,
+  useState,
+  type RefObject,
+} from "react";
 import * as d3 from "d3";
 import * as topojson from "topojson-client";
 import type { Topology } from "topojson-specification";
@@ -28,7 +34,9 @@ interface TerritoryMapProps {
   selectedCounties: Set<string>;
   selectedColor: string;
   onCountyClick: (fips: string) => void;
-  onCountyHover: (info: { fips: string; name: string; state: string } | null) => void;
+  onCountyHover: (
+    info: { fips: string; name: string; state: string } | null,
+  ) => void;
   onCountiesDrag: (fipsList: string[]) => void;
   highlightTerritoryId: number | null;
   editingTerritoryId: number | null;
@@ -62,12 +70,19 @@ export default function TerritoryMap({
   editingTerritoryId,
 }: TerritoryMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const gRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
+  const gRef = useRef<d3.Selection<
+    SVGGElement,
+    unknown,
+    null,
+    undefined
+  > | null>(null);
   const pathRef = useRef<d3.GeoPath | null>(null);
   const [topoData, setTopoData] = useState<Topology | null>(null);
   const [highwayData, setHighwayData] = useState<Topology | null>(null);
   const [cities, setCities] = useState<City[]>([]);
-  const [countyNames, setCountyNames] = useState<Record<string, CountyInfo>>({});
+  const [countyNames, setCountyNames] = useState<Record<string, CountyInfo>>(
+    {},
+  );
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [geometryReady, setGeometryReady] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -141,11 +156,11 @@ export default function TerritoryMap({
 
     const counties = topojson.feature(
       topoData,
-      topoData.objects.counties
+      topoData.objects.counties,
     ) as unknown as GeoJSON.FeatureCollection;
     const states = topojson.feature(
       topoData,
-      topoData.objects.states
+      topoData.objects.states,
     ) as unknown as GeoJSON.FeatureCollection;
 
     const { width, height } = dimensions;
@@ -164,7 +179,7 @@ export default function TerritoryMap({
       .zoom<SVGSVGElement, unknown>()
       .scaleExtent([1, 12])
       .filter((event) => {
-        if (event.type === "wheel" || event.type === "dblclick") return true;
+        if (event.type === "wheel") return true;
         if (event.type === "mousedown" || event.type === "touchstart") {
           return (
             event.button === 1 ||
@@ -181,6 +196,9 @@ export default function TerritoryMap({
       });
 
     svg.call(zoom);
+    // No double-click zoom: rapid clicks while painting counties would
+    // otherwise zoom the map (and toggle the same county twice).
+    svg.on("dblclick.zoom", null);
     svg.on("contextmenu", (event) => event.preventDefault());
 
     // County paths
@@ -196,7 +214,13 @@ export default function TerritoryMap({
       .attr("stroke-width", 0.5)
       .style("cursor", "pointer")
       .on("mousedown", (event: MouseEvent, d) => {
-        if (event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey) return;
+        if (
+          event.button !== 0 ||
+          event.shiftKey ||
+          event.ctrlKey ||
+          event.metaKey
+        )
+          return;
         event.stopPropagation();
         event.preventDefault();
         isDraggingRef.current = true;
@@ -209,7 +233,11 @@ export default function TerritoryMap({
         const fips = String(d.id).padStart(5, "0");
         const info = countyNamesRef.current[fips];
         if (info) {
-          onCountyHoverRef.current({ fips, name: info.name, state: info.state });
+          onCountyHoverRef.current({
+            fips,
+            name: info.name,
+            state: info.state,
+          });
         }
         if (isDraggingRef.current) {
           didDragRef.current = true;
@@ -247,7 +275,7 @@ export default function TerritoryMap({
     if (highwayData) {
       const motorways = topojson.feature(
         highwayData,
-        highwayData.objects.highways
+        highwayData.objects.highways,
       ) as unknown as GeoJSON.FeatureCollection;
 
       const clipId = "states-clip";
@@ -260,7 +288,12 @@ export default function TerritoryMap({
         .attr("d", path);
 
       const applyRoadBase = (
-        sel: d3.Selection<SVGPathElement, GeoJSON.Feature, SVGGElement, unknown>
+        sel: d3.Selection<
+          SVGPathElement,
+          GeoJSON.Feature,
+          SVGGElement,
+          unknown
+        >,
       ) =>
         sel
           .attr("d", path)
@@ -278,7 +311,7 @@ export default function TerritoryMap({
           .attr("class", "highway i-casing")
           .attr("stroke", "#4a1a13")
           .attr("stroke-width", 1.0)
-          .attr("stroke-opacity", 0.85)
+          .attr("stroke-opacity", 0.85),
       );
       applyRoadBase(
         g
@@ -288,7 +321,7 @@ export default function TerritoryMap({
           .attr("class", "highway i-fill")
           .attr("stroke", "#a83a28")
           .attr("stroke-width", 0.51)
-          .attr("stroke-opacity", 1.0)
+          .attr("stroke-opacity", 1.0),
       );
     }
 
@@ -309,7 +342,12 @@ export default function TerritoryMap({
       const cityGroup = g.append("g").attr("class", "cities-layer");
 
       // Uniform style for every city — no tier-based emphasis
-      const tierStyle = (_t: 1 | 2 | 3) => ({ r: 0.75, fs: 6, fw: 400, opacity: 0.6 });
+      const tierStyle = (_t: 1 | 2 | 3) => ({
+        r: 0.75,
+        fs: 6,
+        fw: 400,
+        opacity: 0.6,
+      });
 
       cityGroup
         .selectAll("g.city")
@@ -322,7 +360,9 @@ export default function TerritoryMap({
           if (!point) return;
           const [x, y] = point;
           const s = tierStyle(c.tier);
-          const group = d3.select(this).attr("transform", `translate(${x}, ${y})`);
+          const group = d3
+            .select(this)
+            .attr("transform", `translate(${x}, ${y})`);
 
           // Dot (white halo + dark center)
           group
@@ -350,7 +390,7 @@ export default function TerritoryMap({
             .attr("y", dy)
             .attr(
               "text-anchor",
-              centered ? "middle" : leftAnchored ? "end" : "start"
+              centered ? "middle" : leftAnchored ? "end" : "start",
             )
             .attr("dominant-baseline", "central")
             .attr("font-size", `${s.fs}px`)
@@ -395,7 +435,7 @@ export default function TerritoryMap({
 
     const counties = topojson.feature(
       topoData,
-      topoData.objects.counties
+      topoData.objects.counties,
     ) as unknown as GeoJSON.FeatureCollection;
     const projection = d3.geoAlbersUsa().fitSize([width, height], counties);
     const path = d3.geoPath().projection(projection);
@@ -404,7 +444,10 @@ export default function TerritoryMap({
     const g = gRef.current;
     g.selectAll<SVGPathElement, GeoJSON.Feature>("path.county").attr("d", path);
     g.selectAll<SVGPathElement, GeoJSON.Feature>("path.state").attr("d", path);
-    g.selectAll<SVGPathElement, GeoJSON.Feature>("path.highway").attr("d", path);
+    g.selectAll<SVGPathElement, GeoJSON.Feature>("path.highway").attr(
+      "d",
+      path,
+    );
     // Clip path lives under svg > defs, not inside g
     svg
       .select("defs > clipPath")
@@ -420,7 +463,7 @@ export default function TerritoryMap({
       (c) => {
         const pt = projection([c.lon, c.lat]);
         return pt ? `translate(${pt[0]}, ${pt[1]})` : "";
-      }
+      },
     );
   }, [dimensions, geometryReady, topoData, svgRef]);
 
@@ -454,7 +497,8 @@ export default function TerritoryMap({
       })
       .attr("opacity", function () {
         const fips = d3.select(this).attr("data-fips");
-        if (selectedCounties.has(fips)) return Math.min(TERRITORY_FILL_OPACITY + 0.1, 1);
+        if (selectedCounties.has(fips))
+          return Math.min(TERRITORY_FILL_OPACITY + 0.1, 1);
         const territory = ctMap.get(fips);
         return territory ? TERRITORY_FILL_OPACITY : 1;
       });
@@ -513,7 +557,9 @@ export default function TerritoryMap({
           role="alert"
           data-testid="map-error"
         >
-          <p className="text-sm font-medium text-foreground">Couldn't load the map</p>
+          <p className="text-sm font-medium text-foreground">
+            Couldn't load the map
+          </p>
           <p className="max-w-xs text-xs text-muted-foreground">
             The map data didn't load. Check your connection and try again.
           </p>
