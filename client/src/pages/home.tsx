@@ -3,7 +3,14 @@ import TerritoryMap from "@/components/TerritoryMap";
 import TerritoryPanel from "@/components/TerritoryPanel";
 import MapLegend from "@/components/MapLegend";
 import RepDetailsDialog from "@/components/RepDetailsDialog";
-import { PanelLeftClose, PanelLeft, Download, Upload, FileDown, Trash2 } from "lucide-react";
+import {
+  PanelLeftClose,
+  PanelLeft,
+  Download,
+  Upload,
+  FileDown,
+  Trash2,
+} from "lucide-react";
 import { importFileSchema } from "@/lib/storage";
 import { useTerritories } from "@/lib/use-territories";
 
@@ -46,9 +53,11 @@ function HeaderButton({
         aria-label={title}
         data-testid={testId}
         className={`inline-flex items-center justify-center w-8 h-8 rounded-md transition-colors
-          ${destructive
-            ? "text-white/85 hover:bg-red-500/80 hover:text-white"
-            : "text-white/85 hover:bg-white/15 hover:text-white"}
+          ${
+            destructive
+              ? "text-white/85 hover:bg-red-500/80 hover:text-white"
+              : "text-white/85 hover:bg-white/15 hover:text-white"
+          }
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--brand-gold))]`}
       >
         {children}
@@ -106,8 +115,12 @@ export default function Home() {
     name: string;
     state: string;
   } | null>(null);
-  const [highlightTerritoryId, setHighlightTerritoryId] = useState<number | null>(null);
-  const [countyNames, setCountyNames] = useState<Record<string, CountyInfo>>({});
+  const [highlightTerritoryId, setHighlightTerritoryId] = useState<
+    number | null
+  >(null);
+  const [countyNames, setCountyNames] = useState<Record<string, CountyInfo>>(
+    {},
+  );
   const [panelOpen, setPanelOpen] = useState(true);
   const [importError, setImportError] = useState<string | null>(null);
   const [detailsId, setDetailsId] = useState<number | null>(null);
@@ -131,7 +144,7 @@ export default function Home() {
     (info: { fips: string; name: string; state: string } | null) => {
       setHoveredCounty(info);
     },
-    []
+    [],
   );
 
   // --- Export / Import ---
@@ -179,7 +192,7 @@ export default function Home() {
           const result = importFileSchema.safeParse(parsed);
           if (!result.success) {
             setImportError(
-              "Invalid file format. Expected an array of territories with name, color, and counties."
+              "Invalid file format. Expected an array of territories with name, color, and counties.",
             );
             return;
           }
@@ -189,13 +202,22 @@ export default function Home() {
             name: item.name,
             color: item.color,
             countyFips: item.counties.map((c) =>
-              typeof c === "string" ? c : c.fips
+              typeof c === "string" ? c : c.fips,
             ),
             title: item.title,
             branch: item.branch,
             phone: item.phone,
             email: item.email,
           }));
+          // Importing replaces everything — confirm like delete/clear-all do.
+          if (territories.length > 0) {
+            const confirmed = window.confirm(
+              `Importing will replace your current ${territories.length} territor${
+                territories.length === 1 ? "y" : "ies"
+              } with ${imported.length} from the file. Continue?`,
+            );
+            if (!confirmed) return;
+          }
           replaceAll(imported);
         } catch {
           setImportError("Could not parse file — is it valid JSON?");
@@ -204,7 +226,7 @@ export default function Home() {
       reader.readAsText(file);
       if (fileInputRef.current) fileInputRef.current.value = "";
     },
-    [replaceAll]
+    [replaceAll, territories.length],
   );
 
   return (
@@ -390,23 +412,24 @@ export default function Home() {
 
       {/* Rep details dialog — opened from the territory card's Info button
           or by double-clicking a name in the map legend */}
-      {detailsId != null && (() => {
-        const territory = territories.find((t) => t.id === detailsId);
-        if (!territory) return null;
-        // Colors used by OTHER territories — the one being edited keeps its own
-        const usedByOthers = new Set(
-          territories.filter((t) => t.id !== detailsId).map((t) => t.color)
-        );
-        return (
-          <RepDetailsDialog
-            territory={territory}
-            colors={colors}
-            usedColors={usedByOthers}
-            onSave={(updates) => updateTerritory(territory.id, updates)}
-            onClose={() => setDetailsId(null)}
-          />
-        );
-      })()}
+      {detailsId != null &&
+        (() => {
+          const territory = territories.find((t) => t.id === detailsId);
+          if (!territory) return null;
+          // Colors used by OTHER territories — the one being edited keeps its own
+          const usedByOthers = new Set(
+            territories.filter((t) => t.id !== detailsId).map((t) => t.color),
+          );
+          return (
+            <RepDetailsDialog
+              territory={territory}
+              colors={colors}
+              usedColors={usedByOthers}
+              onSave={(updates) => updateTerritory(territory.id, updates)}
+              onClose={() => setDetailsId(null)}
+            />
+          );
+        })()}
     </div>
   );
 }
